@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 #[warn(unused_imports)]
 use crate::vectors::BVec;
+use crate::randomizer::{self, Randomizer};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum BType {
@@ -10,6 +11,16 @@ pub enum BType {
     Green,
     Purple,
     Wall,
+}
+
+fn to_btype(i: i32) -> BType {
+    match i {
+        0 => BType::Red,
+        1 => BType::Blue,
+        2 => BType::Green,
+        3 => BType::Purple,
+        _ => panic!()
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -21,11 +32,12 @@ struct Buyo {
 pub struct Game {
     buyos: HashMap<BVec, BType>,
     controlled_buyo: Option<(Buyo, Buyo)>,
+    randomizer: Randomizer,
 }
 
 impl Game {
     // create a game board
-    pub fn new(width: i32, height: i32) -> Game {
+    pub fn new(width: i32, height: i32, randomizer: Randomizer) -> Game {
         let mut buyos = HashMap::new();
         for x in 0..width + 2 {
             for y in 0..height + 2 {
@@ -37,6 +49,7 @@ impl Game {
         Game {
             buyos,
             controlled_buyo: None,
+            randomizer
         }
     }
     pub fn board(&self) -> &HashMap<BVec, BType> {
@@ -248,11 +261,11 @@ impl Game {
             // no more buyos to pop
             let b1 = Buyo {
                 p: BVec { x: 3, y: 1 },
-                t: BType::Red,
+                t: to_btype(self.randomizer.next()),
             };
             let b2 = Buyo {
                 p: &b1.p + &BVec { x: 0, y: 1 },
-                t: BType::Red,
+                t: to_btype(self.randomizer.next()),
             };
             self.spawn_c_buyo((b1, b2));
             return true;

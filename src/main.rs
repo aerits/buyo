@@ -1,11 +1,13 @@
 use buyo_game::Game;
+use randomizer::Randomizer;
 use std::{io, time::{self, SystemTime}};
 
 mod buyo_game;
 mod vectors;
+mod randomizer;
 
 fn main() {
-    let mut a = Game::new(6, 12);
+    let mut a = Game::new(6, 12, Randomizer::new(4));
     let mut now = SystemTime::now();
     let mut last_update = now;
     let mut successful_update = false;
