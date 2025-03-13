@@ -79,20 +79,20 @@ impl Game {
             Some(x) => x,
             None => panic!(),
         };
-        let v1_old = b.1.p.clone();
-        let v2_old = b.0.p.clone();
-        b.1.p.mult_s(-1);
-        b.0.p.add_v(b.0.p); // set b.0 to be the origin
-        b.1.p.clear();
+        let v1_old = b.0.p.clone();
+        let v2_old = b.1.p.clone();
+        b.0.p.mult_s(-1);
+        b.1.p.add_v(b.0.p); // set b.0 to be the origin
+        b.0.p.clear();
         // mult by matrix [[cos -90 sin -90] [-sin -90 cos -90]] r amount of times
         for _ in 0..r {
-            let x_old = b.0.p.x;
-            b.0.p.x = b.1.p.y;
-            b.0.p.y = -x_old;
+            let x_old = b.1.p.x;
+            b.1.p.x = b.1.p.y;
+            b.1.p.y = -x_old;
         }
 
         // set pos of second vector to read later
-        let pos = match b.0.p.x {
+        let pos = match b.1.p.x {
             1 => 0,  // right
             -1 => 1, // left
             0 => 2,  // down
@@ -100,8 +100,8 @@ impl Game {
         };
 
         // move vectors back to old positions
-        b.1.p = v1_old;
-        b.0.p.add_v(v1_old);
+        b.0.p = v1_old;
+        b.1.p.add_v(v1_old);
 
         // check if theres a vector already there on the grid
         if self.buyos.contains_key(&b.1.p) {
@@ -114,25 +114,25 @@ impl Game {
             let should_undo: bool;
             match pos {
                 2 => {
-                    b.1.p.add_i(0, -1);
                     b.0.p.add_i(0, -1);
+                    b.1.p.add_i(0, -1);
                     should_undo = false;
                 }
                 1 => {
-                    b.1.p.add_i(1, 0); // move right
+                    b.0.p.add_i(1, 0); // move right
                     should_undo = self.buyos.contains_key(&b.0.p); // undo the rotation
-                    b.0.p.add_i(1, 0);
+                    b.1.p.add_i(1, 0);
                 }
                 0 => {
-                    b.1.p.add_i(-1, 0);
-                    should_undo = self.buyos.contains_key(&b.0.p); // undo the rotation
                     b.0.p.add_i(-1, 0);
+                    should_undo = self.buyos.contains_key(&b.0.p); // undo the rotation
+                    b.1.p.add_i(-1, 0);
                 }
                 _ => panic!(),
             }
             if should_undo {
-                b.1.p = v1_old;
-                b.0.p = v2_old;
+                b.0.p = v1_old;
+                b.1.p = v2_old;
             }
             return should_undo;
         }
@@ -275,11 +275,11 @@ impl Game {
             }
             // no more buyos to pop
             let b1 = Buyo {
-                p: BVec { x: 3, y: 1 },
+                p: BVec { x: 3, y: 2 },
                 t: to_btype(self.randomizer.next()),
             };
             let b2 = Buyo {
-                p: &b1.p + &BVec { x: 0, y: 1 },
+                p: &b1.p + &BVec { x: 0, y: -1 },
                 t: to_btype(self.randomizer.next()),
             };
             self.spawn_c_buyo((b1, b2));
