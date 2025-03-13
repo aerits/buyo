@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-#[warn(unused_imports)]
+use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
-use crate::randomizer::{self, Randomizer};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum BType {
@@ -19,7 +18,7 @@ fn to_btype(i: i32) -> BType {
         1 => BType::Blue,
         2 => BType::Green,
         3 => BType::Purple,
-        _ => panic!()
+        _ => panic!(),
     }
 }
 
@@ -49,11 +48,19 @@ impl Game {
         Game {
             buyos,
             controlled_buyo: None,
-            randomizer
+            randomizer,
         }
     }
-    pub fn board(&self) -> &HashMap<BVec, BType> {
-        return &self.buyos;
+    pub fn board(&self) -> HashMap<BVec, BType> {
+        let mut a = self.buyos.clone();
+        match self.controlled_buyo {
+            Some(x) => {
+                a.insert(x.0.p, x.0.t);
+                a.insert(x.1.p, x.1.t);
+            }
+            None => (),
+        }
+        return a;
     }
 
     // set controlled buyo to the inputted buyo
@@ -72,20 +79,20 @@ impl Game {
             Some(x) => x,
             None => panic!(),
         };
-        let v1_old = b.0.p.clone();
-        let v2_old = b.1.p.clone();
-        b.0.p.mult_s(-1);
-        b.1.p.add_v(b.0.p); // set b.0 to be the origin
-        b.0.p.clear();
+        let v1_old = b.1.p.clone();
+        let v2_old = b.0.p.clone();
+        b.1.p.mult_s(-1);
+        b.0.p.add_v(b.0.p); // set b.0 to be the origin
+        b.1.p.clear();
         // mult by matrix [[cos -90 sin -90] [-sin -90 cos -90]] r amount of times
         for _ in 0..r {
-            let x_old = b.1.p.x;
-            b.1.p.x = b.1.p.y;
-            b.1.p.y = -x_old;
+            let x_old = b.0.p.x;
+            b.0.p.x = b.1.p.y;
+            b.0.p.y = -x_old;
         }
 
         // set pos of second vector to read later
-        let pos = match b.1.p.x {
+        let pos = match b.0.p.x {
             1 => 0,  // right
             -1 => 1, // left
             0 => 2,  // down
@@ -93,8 +100,8 @@ impl Game {
         };
 
         // move vectors back to old positions
-        b.0.p = v1_old;
-        b.1.p.add_v(v1_old);
+        b.1.p = v1_old;
+        b.0.p.add_v(v1_old);
 
         // check if theres a vector already there on the grid
         if self.buyos.contains_key(&b.1.p) {
@@ -107,25 +114,25 @@ impl Game {
             let should_undo: bool;
             match pos {
                 2 => {
-                    b.0.p.add_i(0, -1);
                     b.1.p.add_i(0, -1);
+                    b.0.p.add_i(0, -1);
                     should_undo = false;
                 }
                 1 => {
-                    b.0.p.add_i(1, 0); // move right
+                    b.1.p.add_i(1, 0); // move right
                     should_undo = self.buyos.contains_key(&b.0.p); // undo the rotation
-                    b.1.p.add_i(1, 0);
+                    b.0.p.add_i(1, 0);
                 }
                 0 => {
-                    b.0.p.add_i(-1, 0);
-                    should_undo = self.buyos.contains_key(&b.0.p); // undo the rotation
                     b.1.p.add_i(-1, 0);
+                    should_undo = self.buyos.contains_key(&b.0.p); // undo the rotation
+                    b.0.p.add_i(-1, 0);
                 }
                 _ => panic!(),
             }
             if should_undo {
-                b.0.p = v1_old;
-                b.1.p = v2_old;
+                b.1.p = v1_old;
+                b.0.p = v2_old;
             }
             return should_undo;
         }
@@ -139,7 +146,7 @@ impl Game {
             None => return false,
         };
         self.buyos.insert(x.0.p, x.0.t);
-        self.buyos.insert(x.1.p, x.0.t);
+        self.buyos.insert(x.1.p, x.1.t);
         self.controlled_buyo = None;
         true
     }
@@ -180,6 +187,12 @@ impl Game {
         }
         true
     }
+    pub fn next_buyo(&mut self) -> (BType, BType) {
+        let crnt_ptr = self.randomizer.current_pointer();
+        let type_a = to_btype(self.randomizer.get(crnt_ptr + 1));
+        let type_b = to_btype(self.randomizer.get(crnt_ptr + 2));
+        return (type_a, type_b);
+    }
     // for every buyo in buyos, move them down as gravity would move them
     fn gravity(&mut self) -> bool {
         let mut moved = false;
@@ -205,6 +218,7 @@ impl Game {
     fn pop_buyos(&mut self) -> bool {
         let a = self.gravity();
         if a {
+            while self.gravity() {}
             return true;
         }
         let mut has_popped: bool = false;
@@ -243,16 +257,17 @@ impl Game {
         has_popped
     }
     // place this in a loop that also does detection of inputs and whatnot
+    // returns not on floor
     pub fn game_loop(
         &mut self,
-        dt: i32,
+        // dt: i32,
         time_to_freeze: bool,
-        successful_update: &mut bool,
+        // successful_update: &mut bool,
     ) -> bool {
-        if dt < 1 {
-            return true;
-        } // only update if change in time is 1
-        *successful_update = true;
+        // if dt < 1 {
+        //     return true;
+        // } // only update if change in time is 1
+        // *successful_update = true;
         if self.controlled_buyo == None {
             let a = self.pop_buyos();
             if a {
