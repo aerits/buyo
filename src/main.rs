@@ -39,7 +39,7 @@ impl GameHandler {
             game: Game::new(6, 12, Randomizer::new(4)),
             last_update_time: SystemTime::now(),
             time_to_freeze: false,
-            das: Duration::from_millis(50),
+            das: Duration::from_millis(120),
         }
     }
 }
@@ -62,41 +62,38 @@ impl WindowHandler for MyWindowHandler {
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
         match self.state {
             GameState::Gaming(ref mut game_handler) => {
-
                 //////////////////////////////////////////////// HANDLE INPUTS
                 for (key, time) in &self.pressed_down_keys {
                     match key {
                         VirtualKeyCode::Left => {
                             if SystemTime::now().duration_since(*time).unwrap() > game_handler.das
-                                || SystemTime::now().duration_since(*time).unwrap()
-                                    < Duration::from_millis(2)
+                                || key_just_pressed(time)
                             {
                                 game_handler.game.input_left()
                             }
                         }
                         VirtualKeyCode::Right => {
                             if SystemTime::now().duration_since(*time).unwrap() > game_handler.das
-                                || SystemTime::now().duration_since(*time).unwrap()
-                                    < Duration::from_millis(2)
+                                || key_just_pressed(time)
                             {
                                 game_handler.game.input_right()
                             }
                         }
                         VirtualKeyCode::Z => {
-                            if SystemTime::now().duration_since(*time).unwrap()
-                                < Duration::from_millis(2)
-                            {
+                            if key_just_pressed(time) {
                                 game_handler.game.input_rotation_right()
                             }
                         }
                         VirtualKeyCode::X => {
-                            if SystemTime::now().duration_since(*time).unwrap()
-                                < Duration::from_millis(2)
-                            {
+                            if key_just_pressed(time) {
                                 game_handler.game.input_rotation_left()
                             }
                         }
-                        VirtualKeyCode::Space => game_handler.game.hard_drop(),
+                        VirtualKeyCode::Space => {
+                            if key_just_pressed(time) {
+                                game_handler.game.hard_drop()
+                            }
+                        }
                         _ => panic!(),
                     }
                 }
@@ -176,4 +173,8 @@ fn btype_to_color(b: BType) -> Color {
         BType::Purple => Color::MAGENTA,
         BType::Wall => Color::BLACK,
     }
+}
+
+pub fn key_just_pressed(time: &SystemTime) -> bool {
+    return SystemTime::now().duration_since(*time).unwrap() < Duration::from_millis(2);
 }
