@@ -169,6 +169,9 @@ impl Game {
         while self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }) {}
         self.freeze_c_buyo();
     }
+    pub fn move_c_buyo_down(&mut self) {
+        self.move_c_buyo_if_no_collision(BVec{x: 0, y: 1});
+    }
     // return false if there is no c buyo
     // return false if it collided and couldn't move
     fn move_c_buyo_if_no_collision(&mut self, v: BVec) -> bool {
@@ -286,13 +289,13 @@ impl Game {
             return true;
         }
 
-        let a = self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }); // gravity on buyo
+        // let a = self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }); // gravity on buyo
                                                                        // interpolate this on graphics
         if time_to_freeze {
             self.freeze_c_buyo();
             return true;
         }
-        return a;
+        return true;
     }
 
     pub fn print_grid(&self) {

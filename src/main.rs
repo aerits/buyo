@@ -32,6 +32,8 @@ struct GameHandler {
     last_update_time: SystemTime,
     time_to_freeze: bool,
     das: Duration,
+    last_fall_time: SystemTime,
+    gravity: Duration,
 }
 impl GameHandler {
     pub fn new() -> GameHandler {
@@ -40,6 +42,8 @@ impl GameHandler {
             last_update_time: SystemTime::now(),
             time_to_freeze: false,
             das: Duration::from_millis(120),
+            last_fall_time: SystemTime::now(),
+            gravity: Duration::from_millis(1000),
         }
     }
 }
@@ -91,7 +95,8 @@ impl WindowHandler for MyWindowHandler {
                         }
                         VirtualKeyCode::Space => {
                             if key_just_pressed(time) {
-                                game_handler.game.hard_drop()
+                                game_handler.game.hard_drop();
+                                game_handler.last_update_time = SystemTime::UNIX_EPOCH; 
                             }
                         }
                         _ => panic!(),
@@ -101,9 +106,7 @@ impl WindowHandler for MyWindowHandler {
                 ///////////////////////////////////////////////// HANDLE GAME LOGIC
                 if SystemTime::now()
                     .duration_since(game_handler.last_update_time)
-                    .unwrap()
-                    .as_secs()
-                    > 1
+                    .unwrap() > Duration::from_millis(500)
                 {
                     // self.game.print_grid();
                     let on_floor = !game_handler.game.game_loop(game_handler.time_to_freeze);
@@ -113,6 +116,10 @@ impl WindowHandler for MyWindowHandler {
                     } else {
                         game_handler.time_to_freeze = false;
                     }
+                }
+                if SystemTime::now().duration_since(game_handler.last_fall_time).unwrap() > game_handler.gravity {
+                    game_handler.last_fall_time = SystemTime::now();
+                    game_handler.game.move_c_buyo_down();
                 }
 
                 /////////////////////////////////////////// HANDLE DRAWING THE GAME
