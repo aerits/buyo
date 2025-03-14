@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
+use crate::blockstacker::BlockStacker;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum BType {
@@ -34,9 +35,9 @@ pub struct Game {
     randomizer: Randomizer,
 }
 
-impl Game {
+impl BlockStacker<BType> for Game {
     // create a game board
-    pub fn new(width: i32, height: i32, randomizer: Randomizer) -> Game {
+    fn new(width: i32, height: i32, randomizer: Randomizer) -> Game {
         let mut buyos = HashMap::new();
         for x in 0..width + 2 {
             for y in 0..height + 2 {
@@ -51,7 +52,7 @@ impl Game {
             randomizer,
         }
     }
-    pub fn board(&self) -> HashMap<BVec, BType> {
+    fn board(&self) -> HashMap<BVec, BType> {
         let mut a = self.buyos.clone();
         match self.controlled_buyo {
             Some(x) => {
@@ -62,7 +63,69 @@ impl Game {
         }
         return a;
     }
+    fn input_left(&mut self) {
+        self.move_c_buyo_if_no_collision(BVec { x: -1, y: 0 });
+    }
+    fn input_right(&mut self) {
+        self.move_c_buyo_if_no_collision(BVec { x: 1, y: 0 });
+    }
+    fn input_rotation_right(&mut self) {
+        self.rotate_c_buyo(1);
+    }
+    fn input_rotation_left(&mut self) {
+        self.rotate_c_buyo(3);
+    }
+    fn input_180_rot(&mut self) {
+        self.rotate_c_buyo(2);
+    }
+    fn hard_drop(&mut self) {
+        while self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }) {}
+        self.freeze_c_buyo();
+    }
+    fn move_c_buyo_down(&mut self) {
+        self.move_c_buyo_if_no_collision(BVec{x: 0, y: 1});
+    }
+    // place this in a loop that also does detection of inputs and whatnot
+    // returns not on floor
+    fn game_loop(
+        &mut self,
+        // dt: i32,
+        time_to_freeze: bool,
+        // successful_update: &mut bool,
+    ) -> bool {
+        // if dt < 1 {
+        //     return true;
+        // } // only update if change in time is 1
+        // *successful_update = true;
+        if self.controlled_buyo == None {
+            let a = self.pop_buyos();
+            if a {
+                return true;
+            }
+            // no more buyos to pop
+            let b1 = Buyo {
+                p: BVec { x: 3, y: 2 },
+                t: to_btype(self.randomizer.next()),
+            };
+            let b2 = Buyo {
+                p: &b1.p + &BVec { x: 0, y: -1 },
+                t: to_btype(self.randomizer.next()),
+            };
+            self.spawn_c_buyo((b1, b2));
+            return true;
+        }
 
+        // let a = self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }); // gravity on buyo
+                                                                       // interpolate this on graphics
+        if time_to_freeze {
+            self.freeze_c_buyo();
+            return true;
+        }
+        return true;
+    }
+}
+
+impl Game {
     // set controlled buyo to the inputted buyo
     // if there already is a buyo return false
     fn spawn_c_buyo(&mut self, b: (Buyo, Buyo)) -> bool {
@@ -149,28 +212,6 @@ impl Game {
         self.buyos.insert(x.1.p, x.1.t);
         self.controlled_buyo = None;
         true
-    }
-    pub fn input_left(&mut self) {
-        self.move_c_buyo_if_no_collision(BVec { x: -1, y: 0 });
-    }
-    pub fn input_right(&mut self) {
-        self.move_c_buyo_if_no_collision(BVec { x: 1, y: 0 });
-    }
-    pub fn input_rotation_right(&mut self) {
-        self.rotate_c_buyo(1);
-    }
-    pub fn input_rotation_left(&mut self) {
-        self.rotate_c_buyo(3);
-    }
-    pub fn input_180_rot(&mut self) {
-        self.rotate_c_buyo(2);
-    }
-    pub fn hard_drop(&mut self) {
-        while self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }) {}
-        self.freeze_c_buyo();
-    }
-    pub fn move_c_buyo_down(&mut self) {
-        self.move_c_buyo_if_no_collision(BVec{x: 0, y: 1});
     }
     // return false if there is no c buyo
     // return false if it collided and couldn't move
@@ -259,45 +300,7 @@ impl Game {
         }
         has_popped
     }
-    // place this in a loop that also does detection of inputs and whatnot
-    // returns not on floor
-    pub fn game_loop(
-        &mut self,
-        // dt: i32,
-        time_to_freeze: bool,
-        // successful_update: &mut bool,
-    ) -> bool {
-        // if dt < 1 {
-        //     return true;
-        // } // only update if change in time is 1
-        // *successful_update = true;
-        if self.controlled_buyo == None {
-            let a = self.pop_buyos();
-            if a {
-                return true;
-            }
-            // no more buyos to pop
-            let b1 = Buyo {
-                p: BVec { x: 3, y: 2 },
-                t: to_btype(self.randomizer.next()),
-            };
-            let b2 = Buyo {
-                p: &b1.p + &BVec { x: 0, y: -1 },
-                t: to_btype(self.randomizer.next()),
-            };
-            self.spawn_c_buyo((b1, b2));
-            return true;
-        }
-
-        // let a = self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }); // gravity on buyo
-                                                                       // interpolate this on graphics
-        if time_to_freeze {
-            self.freeze_c_buyo();
-            return true;
-        }
-        return true;
-    }
-
+    
     pub fn print_grid(&self) {
         // Determine the bounds of the grid
         let mut min_x = i32::MAX;

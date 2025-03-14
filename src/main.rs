@@ -1,3 +1,4 @@
+use blockstacker::BlockStacker;
 use buyo_game::{BType, Game};
 use randomizer::Randomizer;
 use speedy2d::color::Color;
@@ -21,6 +22,7 @@ fn main() {
 mod buyo_game;
 mod randomizer;
 mod vectors;
+mod blockstacker;
 
 enum GameState {
     Gaming(GameHandler),
@@ -30,10 +32,12 @@ enum GameState {
 struct GameHandler {
     game: Game,
     last_update_time: SystemTime,
-    time_to_freeze: bool,
-    das: Duration,
+    time_to_freeze: bool, // set by game
+    das: Duration, // set by user
+    arr: Duration, // set by user
     last_fall_time: SystemTime,
-    gravity: Duration,
+    gravity: Duration, // set by game
+    fps: i32,
 }
 impl GameHandler {
     pub fn new() -> GameHandler {
@@ -42,8 +46,10 @@ impl GameHandler {
             last_update_time: SystemTime::now(),
             time_to_freeze: false,
             das: Duration::from_millis(120),
+            arr: Duration::from_millis(20),
             last_fall_time: SystemTime::now(),
-            gravity: Duration::from_millis(1000),
+            gravity: Duration::from_secs(1),
+            fps: 0
         }
     }
 }
@@ -73,14 +79,19 @@ impl WindowHandler for MyWindowHandler {
                             if SystemTime::now().duration_since(*time).unwrap() > game_handler.das
                                 || key_just_pressed(time)
                             {
-                                game_handler.game.input_left()
+                                if SystemTime::now().duration_since(*time).unwrap().as_millis() % game_handler.arr.as_millis() == 0 {
+                                    game_handler.game.input_left()
+                                }
+                                
                             }
                         }
                         VirtualKeyCode::Right => {
                             if SystemTime::now().duration_since(*time).unwrap() > game_handler.das
                                 || key_just_pressed(time)
                             {
-                                game_handler.game.input_right()
+                                if SystemTime::now().duration_since(*time).unwrap().as_millis() % game_handler.arr.as_millis() == 0 {
+                                    game_handler.game.input_right()
+                                }
                             }
                         }
                         VirtualKeyCode::Z => {
@@ -108,7 +119,7 @@ impl WindowHandler for MyWindowHandler {
                     .duration_since(game_handler.last_update_time)
                     .unwrap() > Duration::from_millis(500)
                 {
-                    // self.game.print_grid();
+                    // game_handler.game.print_grid();
                     let on_floor = !game_handler.game.game_loop(game_handler.time_to_freeze);
                     game_handler.last_update_time = SystemTime::now();
                     if on_floor {
@@ -120,7 +131,10 @@ impl WindowHandler for MyWindowHandler {
                 if SystemTime::now().duration_since(game_handler.last_fall_time).unwrap() > game_handler.gravity {
                     game_handler.last_fall_time = SystemTime::now();
                     game_handler.game.move_c_buyo_down();
+                    println!("{}", game_handler.fps);
+                    game_handler.fps = 0;
                 }
+                game_handler.fps += 1;
 
                 /////////////////////////////////////////// HANDLE DRAWING THE GAME
                 graphics.clear_screen(Color::WHITE);
