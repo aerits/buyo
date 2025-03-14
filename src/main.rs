@@ -7,6 +7,7 @@ use speedy2d::{Graphics2D, Window};
 use std::alloc::System;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 use std::rc::Rc;
 use std::time::Duration;
 use std::{
@@ -25,12 +26,13 @@ mod vectors;
 mod blockstacker;
 
 enum GameState {
-    Gaming(GameHandler),
+    Gaming(GameHandler<Game, BType>),
     Menu,
 }
 
-struct GameHandler {
-    game: Game,
+struct GameHandler<T: BlockStacker<F>, F> {
+    game: T,
+    phantom: std::marker::PhantomData<F>,
     last_update_time: SystemTime,
     time_to_freeze: bool, // set by game
     das: Duration, // set by user
@@ -39,10 +41,11 @@ struct GameHandler {
     gravity: Duration, // set by game
     fps: i32,
 }
-impl GameHandler {
-    pub fn new() -> GameHandler {
+impl <T: BlockStacker<F>, F> GameHandler<T, F> {
+    pub fn new() -> GameHandler<T, F> {
         GameHandler {
-            game: Game::new(6, 12, Randomizer::new(4)),
+            game: T::new(6, 12, Randomizer::new(4)),
+            phantom: PhantomData,
             last_update_time: SystemTime::now(),
             time_to_freeze: false,
             das: Duration::from_millis(120),

@@ -37,7 +37,7 @@ pub struct Game {
 
 impl BlockStacker<BType> for Game {
     // create a game board
-    fn new(width: i32, height: i32, randomizer: Randomizer) -> Game {
+    fn new(width: i32, height: i32, randomizer: Randomizer) -> Self {
         let mut buyos = HashMap::new();
         for x in 0..width + 2 {
             for y in 0..height + 2 {
