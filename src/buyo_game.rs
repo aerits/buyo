@@ -82,8 +82,18 @@ impl BlockStacker<BType> for Game {
         while self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }) {}
         self.freeze_c_buyo();
     }
-    fn move_c_buyo_down(&mut self) {
-        self.move_c_buyo_if_no_collision(BVec{x: 0, y: 1});
+    fn move_c_buyo_down(&mut self) -> bool {
+        self.move_c_buyo_if_no_collision(BVec{x: 0, y: 1})
+    }
+    fn is_on_ground(&self) -> bool {
+        match self.controlled_buyo {
+            Some(x) => {
+                let b1onfloor = self.buyos.contains_key(&(&x.0.p + &BVec::new(0, 1)));
+                let b2onfloor = self.buyos.contains_key(&(&x.1.p + &BVec::new(0, 1)));
+                return b1onfloor || b2onfloor;
+            },
+            None => false,
+        }
     }
     // place this in a loop that also does detection of inputs and whatnot
     // returns not on floor
@@ -140,7 +150,7 @@ impl Game {
     fn rotate_c_buyo(&mut self, r: i32) -> bool {
         let b = match &mut self.controlled_buyo {
             Some(x) => x,
-            None => panic!(),
+            None => return false,
         };
         let v1_old = b.0.p.clone();
         let v2_old = b.1.p.clone();
@@ -235,7 +245,12 @@ impl Game {
         let crnt_ptr = self.randomizer.current_pointer();
         let type_a = to_btype(self.randomizer.get(crnt_ptr + 1));
         let type_b = to_btype(self.randomizer.get(crnt_ptr + 2));
-        return (type_a, type_b);
+        if crnt_ptr == 0 {
+            let type_a = to_btype(self.randomizer.get(crnt_ptr + 3));
+            let type_b = to_btype(self.randomizer.get(crnt_ptr + 4));
+            return (type_b, type_a);
+        }
+        return (type_b, type_a);
     }
     // for every buyo in buyos, move them down as gravity would move them
     fn gravity(&mut self) -> bool {

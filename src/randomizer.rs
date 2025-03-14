@@ -1,9 +1,3 @@
-// use std::time::Duration;
-// use std::{
-//     io,
-//     time::{self, SystemTime},
-// };
-
 use oorandom::Rand64;
 
 use crate::jstime::get_current_time;
@@ -28,7 +22,7 @@ impl Randomizer {
         return *self.queue.get(i as usize).unwrap();
     }
     pub fn current_pointer(&self) -> i32 {
-        return *&self.current
+        return self.current.clone()
     }
     pub fn next(&mut self) -> i32 {
         let a = self.get(self.current);

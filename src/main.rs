@@ -5,16 +5,8 @@ use randomizer::Randomizer;
 use speedy2d::color::Color;
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
-use std::alloc::System;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::rc::Rc;
-// use std::time::Duration;
-// use std::{
-//     io,
-//     time::{self, SystemTime},
-// };
 
 fn main() {
     // let window = Window::new_centered("Title", (640, 480)).unwrap();
@@ -45,7 +37,9 @@ struct GameHandler<T: BlockStacker<F>, F> {
     game: T,
     phantom: std::marker::PhantomData<F>,
     last_update_time: u64,
-    time_to_freeze: bool, // set by game
+    is_time_to_freeze: bool, // set by game,
+    freeze_time: u64, // set by game
+    timestamp_when_on_ground: Option<u64>, // set by game
     das: u64,             // set by user
     arr: u64,             // set by user
     last_fall_time: u64,
@@ -58,12 +52,58 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             game: T::new(6, 12, Randomizer::new(4)),
             phantom: PhantomData,
             last_update_time: get_current_time(),
-            time_to_freeze: false,
+            is_time_to_freeze: false,
+            freeze_time: 5000,
+            timestamp_when_on_ground: None, // this says if its on the ground when did it land
             das: 133, // 120 ms
             arr: 20,  // 20 ms
             last_fall_time: get_current_time(),
             gravity: 1000,
             fps: 0,
+        }
+    }
+    pub fn handle_inputs(&mut self, current_time: &u64, pressed_down_keys: &HashMap<VirtualKeyCode, u64>) {
+        for (key, time) in pressed_down_keys {
+            // log::info!("{:?}, {}", key, time);
+            match key {
+                VirtualKeyCode::Left => {
+                    if current_time - time > self.das
+                        || key_just_pressed(&current_time, time)
+                    {
+                        if key_just_pressed(&current_time, time) || (current_time - time) % self.arr < 100 {
+                            self.game.input_left()
+                        }
+                        // game_handler.game.input_left()
+                    }
+                }
+                VirtualKeyCode::Right => {
+                    if current_time - time > self.das
+                        || key_just_pressed(&current_time, time)
+                    {
+                        if key_just_pressed(&current_time, time) ||  (current_time - time) % self.arr < 100 {
+                            self.game.input_right()
+                        }
+                        // game_handler.game.input_right()
+                    }
+                }
+                VirtualKeyCode::Z => {
+                    if key_just_pressed(&current_time, time) {
+                        self.game.input_rotation_right()
+                    }
+                }
+                VirtualKeyCode::X => {
+                    if key_just_pressed(&current_time, time) {
+                        self.game.input_rotation_left()
+                    }
+                }
+                VirtualKeyCode::Space => {
+                    if key_just_pressed(&current_time, time) {
+                        self.game.hard_drop();
+                        self.last_update_time = 0; // unix epoch time
+                    }
+                }
+                _ => (),
+            }
         }
     }
 }
@@ -100,62 +140,15 @@ impl WindowHandler for MyWindowHandler {
         match self.state {
             GameState::Gaming(ref mut game_handler) => {
                 //////////////////////////////////////////////// HANDLE INPUTS
-                // log::info!("{:?}", self.pressed_down_keys);
                 let current_time = get_current_time();
-                // log::info!("{}", current_time);
-                for (key, time) in &self.pressed_down_keys {
-                    // log::info!("{:?}, {}", key, time);
-                    match key {
-                        VirtualKeyCode::Left => {
-                            if current_time - time > game_handler.das
-                                || key_just_pressed(&current_time, time)
-                            {
-                                if key_just_pressed(&current_time, time) || (current_time - time) % game_handler.arr < 100 {
-                                    game_handler.game.input_left()
-                                }
-                                // game_handler.game.input_left()
-                            }
-                        }
-                        VirtualKeyCode::Right => {
-                            if current_time - time > game_handler.das
-                                || key_just_pressed(&current_time, time)
-                            {
-                                if key_just_pressed(&current_time, time) ||  (current_time - time) % game_handler.arr < 100 {
-                                    game_handler.game.input_right()
-                                }
-                                // game_handler.game.input_right()
-                            }
-                        }
-                        VirtualKeyCode::Z => {
-                            if key_just_pressed(&current_time, time) {
-                                game_handler.game.input_rotation_right()
-                            }
-                        }
-                        VirtualKeyCode::X => {
-                            if key_just_pressed(&current_time, time) {
-                                game_handler.game.input_rotation_left()
-                            }
-                        }
-                        VirtualKeyCode::Space => {
-                            if key_just_pressed(&current_time, time) {
-                                game_handler.game.hard_drop();
-                                game_handler.last_update_time = 0; // unix epoch time
-                            }
-                        }
-                        _ => (),
-                    }
-                }
+                game_handler.handle_inputs(&current_time, &self.pressed_down_keys);
 
                 ///////////////////////////////////////////////// HANDLE GAME LOGIC
                 if current_time - game_handler.last_update_time > 500 {
                     // game_handler.game.print_grid();
-                    let on_floor = !game_handler.game.game_loop(game_handler.time_to_freeze);
+                    game_handler.game.game_loop(game_handler.is_time_to_freeze);
                     game_handler.last_update_time = current_time;
-                    if on_floor {
-                        game_handler.time_to_freeze = true;
-                    } else {
-                        game_handler.time_to_freeze = false;
-                    }
+                    game_handler.is_time_to_freeze = false;
                 }
                 if current_time - game_handler.last_fall_time > game_handler.gravity {
                     game_handler.last_fall_time = current_time;
@@ -164,6 +157,18 @@ impl WindowHandler for MyWindowHandler {
                     game_handler.fps = 0;
                 }
                 game_handler.fps += 1;
+
+                if game_handler.game.is_on_ground() {
+                    match game_handler.timestamp_when_on_ground {
+                        Some(timestamp) => {
+                            if current_time - timestamp > game_handler.freeze_time {
+                                game_handler.timestamp_when_on_ground = None;
+                                game_handler.is_time_to_freeze = true;
+                            }
+                        },
+                        None => {game_handler.timestamp_when_on_ground = Some(current_time);},
+                    }
+                }
 
                 /////////////////////////////////////////// HANDLE DRAWING THE GAME
                 graphics.clear_screen(Color::WHITE);

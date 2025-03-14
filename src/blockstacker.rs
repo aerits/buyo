@@ -11,6 +11,7 @@ pub trait BlockStacker<T> {
     fn input_rotation_left(&mut self);
     fn input_180_rot(&mut self);
     fn hard_drop(&mut self);
-    fn move_c_buyo_down(&mut self);
+    fn move_c_buyo_down(&mut self) -> bool;
+    fn is_on_ground(&self) -> bool;
     fn game_loop(&mut self, time_to_freeze: bool) -> bool;
 }
