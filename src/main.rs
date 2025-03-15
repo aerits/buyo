@@ -62,55 +62,56 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             fps: 0,
         }
     }
-    pub fn handle_inputs(&mut self, current_time: &u64, pressed_down_keys: &HashMap<VirtualKeyCode, u64>) {
-        for (key, time) in pressed_down_keys {
+    pub fn handle_inputs(&mut self, current_time: &u64, pressed_down_keys: &mut HashMap<VirtualKeyCode, u64>, auto_repeating_keys: &mut HashMap<VirtualKeyCode, u64>) {
+        for (key, time) in &auto_repeating_keys.clone() {
+            if *current_time - *time > self.das {
+                match key {
+                    VirtualKeyCode::Left => self.game.input_left(),
+                    VirtualKeyCode::Right => self.game.input_right(),
+                    _ => (),
+                }
+            }
+        }
+        for (key, time) in &pressed_down_keys.clone() {
             // log::info!("{:?}, {}", key, time);
             match key {
                 VirtualKeyCode::Left => {
-                    if current_time - time > self.das
-                        || key_just_pressed(&current_time, time)
-                    {
-                        if key_just_pressed(&current_time, time) || (current_time - time) % self.arr < 100 {
-                            self.game.input_left()
-                        }
-                        // game_handler.game.input_left()
-                    }
+                    if !auto_repeating_keys.contains_key(&key) {self.game.input_left(); auto_repeating_keys.insert(*key, *time);}
+                    
                 }
                 VirtualKeyCode::Right => {
-                    if current_time - time > self.das
-                        || key_just_pressed(&current_time, time)
-                    {
-                        if key_just_pressed(&current_time, time) ||  (current_time - time) % self.arr < 100 {
-                            self.game.input_right()
-                        }
-                        // game_handler.game.input_right()
-                    }
+                    if !auto_repeating_keys.contains_key(&key) {self.game.input_right(); auto_repeating_keys.insert(*key, *time);}
                 }
                 VirtualKeyCode::Z => {
-                    if key_just_pressed(&current_time, time) {
-                        self.game.input_rotation_right()
-                    }
+                    // if key_just_pressed(&current_time, time) {
+                        self.game.input_rotation_right();
+                        pressed_down_keys.remove(key);
+                    // }
                 }
                 VirtualKeyCode::X => {
-                    if key_just_pressed(&current_time, time) {
-                        self.game.input_rotation_left()
-                    }
+                    // if key_just_pressed(&current_time, time) {
+                        self.game.input_rotation_left();
+                        pressed_down_keys.remove(key);
+                    // }
                 }
                 VirtualKeyCode::Space => {
-                    if key_just_pressed(&current_time, time) {
+                    // if key_just_pressed(&current_time, time) {
                         self.game.hard_drop();
                         self.last_update_time = 0; // unix epoch time
-                    }
+                        pressed_down_keys.remove(key);
+                    // }
                 }
                 _ => (),
             }
         }
+        
     }
 }
 
 struct MyWindowHandler {
     state: GameState,
     pressed_down_keys: HashMap<VirtualKeyCode, u64>,
+    auto_repeating_keys: HashMap<VirtualKeyCode, u64>,
 }
 
 impl MyWindowHandler {
@@ -118,6 +119,7 @@ impl MyWindowHandler {
         MyWindowHandler {
             state: GameState::Gaming(GameHandler::new()),
             pressed_down_keys: HashMap::new(),
+            auto_repeating_keys: HashMap::new(),
         }
     }
 }
@@ -139,16 +141,17 @@ impl WindowHandler for MyWindowHandler {
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
         match self.state {
             GameState::Gaming(ref mut game_handler) => {
+                log::info!("version 71");
                 //////////////////////////////////////////////// HANDLE INPUTS
                 let current_time = get_current_time();
-                game_handler.handle_inputs(&current_time, &self.pressed_down_keys);
+                game_handler.handle_inputs(&current_time, &mut self.pressed_down_keys, &mut self.auto_repeating_keys);
 
                 ///////////////////////////////////////////////// HANDLE GAME LOGIC
                 if current_time - game_handler.last_update_time > 500 {
                     // game_handler.game.print_grid();
                     game_handler.game.game_loop(game_handler.is_time_to_freeze);
                     game_handler.last_update_time = current_time;
-                    game_handler.is_time_to_freeze = false;
+                    
                 }
                 if current_time - game_handler.last_fall_time > game_handler.gravity {
                     game_handler.last_fall_time = current_time;
@@ -166,8 +169,11 @@ impl WindowHandler for MyWindowHandler {
                                 game_handler.is_time_to_freeze = true;
                             }
                         },
-                        None => {game_handler.timestamp_when_on_ground = Some(current_time);},
+                        None => {game_handler.timestamp_when_on_ground = Some(get_current_time());},
                     }
+                } else {
+                    game_handler.is_time_to_freeze = false;
+                    game_handler.timestamp_when_on_ground = None;
                 }
 
                 /////////////////////////////////////////// HANDLE DRAWING THE GAME
@@ -216,6 +222,7 @@ impl WindowHandler for MyWindowHandler {
         match virtual_key_code {
             Some(x) => {
                 self.pressed_down_keys.remove(&x);
+                self.auto_repeating_keys.remove(&x);
             }
             None => {}
         };
@@ -233,5 +240,5 @@ fn btype_to_color(b: BType) -> Color {
 }
 
 pub fn key_just_pressed(current: &u64, time: &u64) -> bool {
-    return (current - time) < 6;
+    return (current - time) <= 3;
 }
