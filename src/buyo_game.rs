@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use crate::blockstacker::BlockStacker;
 use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
-use crate::blockstacker::BlockStacker;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum BType {
@@ -52,8 +52,12 @@ impl BlockStacker<BType> for Game {
             randomizer,
         }
     }
-    fn board(&self) -> HashMap<BVec, BType> {
-        let mut a = self.buyos.clone();
+    fn get_board(&self) -> HashMap<BVec, BType> {
+        let a = self.buyos.clone();
+        return a;
+    }
+    fn get_controlled_block(&self) -> HashMap<BVec, BType> {
+        let mut a = HashMap::new();
         match self.controlled_buyo {
             Some(x) => {
                 a.insert(x.0.p, x.0.t);
@@ -83,7 +87,7 @@ impl BlockStacker<BType> for Game {
         self.freeze_c_buyo();
     }
     fn move_c_buyo_down(&mut self) -> bool {
-        self.move_c_buyo_if_no_collision(BVec{x: 0, y: 1})
+        self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 })
     }
     fn is_on_ground(&self) -> bool {
         match self.controlled_buyo {
@@ -91,7 +95,7 @@ impl BlockStacker<BType> for Game {
                 let b1onfloor = self.buyos.contains_key(&(&x.0.p + &BVec::new(0, 1)));
                 let b2onfloor = self.buyos.contains_key(&(&x.1.p + &BVec::new(0, 1)));
                 return b1onfloor || b2onfloor;
-            },
+            }
             None => false,
         }
     }
@@ -126,7 +130,7 @@ impl BlockStacker<BType> for Game {
         }
 
         // let a = self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }); // gravity on buyo
-                                                                       // interpolate this on graphics
+        // interpolate this on graphics
         if time_to_freeze {
             self.freeze_c_buyo();
             return true;
@@ -315,7 +319,7 @@ impl Game {
         }
         has_popped
     }
-    
+
     pub fn print_grid(&self) {
         // Determine the bounds of the grid
         let mut min_x = i32::MAX;

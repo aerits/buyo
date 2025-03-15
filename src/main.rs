@@ -44,6 +44,8 @@ struct GameHandler<T: BlockStacker<F>, F> {
     arr: u64,             // set by user
     last_fall_time: u64,
     gravity: u64, // set by game
+    block_offset: f32,
+    block_offset_dy: f32,
     fps: i32,
 }
 impl<T: BlockStacker<F>, F> GameHandler<T, F> {
@@ -58,7 +60,9 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             das: 133, // 120 ms
             arr: 20,  // 20 ms
             last_fall_time: get_current_time(),
-            gravity: 1000,
+            gravity: 1,
+            block_offset: 0.0, // this lets the buyos move down smoothly instead of moving a whole block down
+            block_offset_dy: 0.5,
             fps: 0,
         }
     }
@@ -96,6 +100,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
                 }
                 VirtualKeyCode::Space => {
                     // if key_just_pressed(&current_time, time) {
+                        self.block_offset = 0.0;
                         self.game.hard_drop();
                         self.last_update_time = 0; // unix epoch time
                         pressed_down_keys.remove(key);
@@ -125,23 +130,10 @@ impl MyWindowHandler {
 }
 
 impl WindowHandler for MyWindowHandler {
-    // fn on_start(
-    //         &mut self,
-    //         helper: &mut WindowHelper<()>,
-    //         info: speedy2d::window::WindowStartupInfo
-    //     ) {
-    //     let mut last_update = get_current_time();
-    //     loop {
-    //         if get_current_time() - last_update > 100 {
-    //             helper.request_redraw();
-    //             last_update = get_current_time();
-    //         }
-    //     }
-    // }
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
         match self.state {
             GameState::Gaming(ref mut game_handler) => {
-                log::info!("version 71");
+                log::info!("version 75");
                 //////////////////////////////////////////////// HANDLE INPUTS
                 let current_time = get_current_time();
                 game_handler.handle_inputs(&current_time, &mut self.pressed_down_keys, &mut self.auto_repeating_keys);
@@ -155,13 +147,18 @@ impl WindowHandler for MyWindowHandler {
                 }
                 if current_time - game_handler.last_fall_time > game_handler.gravity {
                     game_handler.last_fall_time = current_time;
-                    game_handler.game.move_c_buyo_down();
-                    println!("{}", game_handler.fps);
-                    game_handler.fps = 0;
+                    game_handler.block_offset += game_handler.block_offset_dy;
+                    if game_handler.block_offset >= 20.0 { // diameter of block
+                        game_handler.game.move_c_buyo_down();
+                        game_handler.block_offset = 0.0;
+                    }
+                    // println!("{}", game_handler.fps);
+                    // game_handler.fps = 0;
                 }
-                game_handler.fps += 1;
+                // game_handler.fps += 1;
 
                 if game_handler.game.is_on_ground() {
+                    game_handler.block_offset = 0.0;
                     match game_handler.timestamp_when_on_ground {
                         Some(timestamp) => {
                             if current_time - timestamp > game_handler.freeze_time {
@@ -179,9 +176,16 @@ impl WindowHandler for MyWindowHandler {
                 /////////////////////////////////////////// HANDLE DRAWING THE GAME
                 graphics.clear_screen(Color::WHITE);
                 // graphics.draw_circle((100.0, 100.0), 75.0, Color::BLUE);
-                for (v, c) in game_handler.game.board() {
+                for (v, c) in game_handler.game.get_board() {
                     graphics.draw_circle(
                         (v.x as f32 * 20.0 + 20.0, v.y as f32 * 20.0 + 20.0),
+                        10.0,
+                        btype_to_color(c),
+                    );
+                }
+                for (v, c) in game_handler.game.get_controlled_block() {
+                    graphics.draw_circle(
+                        (v.x as f32 * 20.0 + 20.0, v.y as f32 * 20.0 + 20.0 + game_handler.block_offset),
                         10.0,
                         btype_to_color(c),
                     );

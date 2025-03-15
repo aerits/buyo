@@ -4,7 +4,8 @@ use crate::vectors::BVec;
 
 pub trait BlockStacker<T> {
     fn new(width: i32, height: i32, randomizer: Randomizer) -> Self;
-    fn board(&self) -> HashMap<BVec, T>;
+    fn get_board(&self) -> HashMap<BVec, T>;
+    fn get_controlled_block(&self) -> HashMap<BVec, T>;
     fn input_left(&mut self);
     fn input_right(&mut self);
     fn input_rotation_right(&mut self);
