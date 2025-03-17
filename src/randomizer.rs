@@ -22,7 +22,7 @@ impl Randomizer {
         return *self.queue.get(i as usize).unwrap();
     }
     pub fn current_pointer(&self) -> i32 {
-        return self.current.clone()
+        return self.current.clone() - 1
     }
     pub fn next(&mut self) -> i32 {
         let a = self.get(self.current);

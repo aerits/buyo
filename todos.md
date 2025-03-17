@@ -1,9 +1,9 @@
-- add webassembly wgpu to play in web
 - add display to game
     - add a game menu
 - build a block stacking game like tetrio
     - add a swap gamemode
-- create a server
 - change the gameloop method to be less scuffed
-- randomize pieces in a way that can be synced over server so 2 people get the same piece queue
-- reorganize code into more sensible files
+- fix scoring
+- make better graphics
+- create custom font
+- add tetrio quickplay v1

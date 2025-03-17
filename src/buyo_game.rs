@@ -162,16 +162,7 @@ impl BlockStacker<BType> for Game {
     }
     // place this in a loop that also does detection of inputs and whatnot
     // returns not on floor
-    fn game_loop(
-        &mut self,
-        // dt: i32,
-        time_to_freeze: bool,
-        // successful_update: &mut bool,
-    ) -> i32 {
-        // if dt < 1 {
-        //     return true;
-        // } // only update if change in time is 1
-        // *successful_update = true;
+    fn game_loop(&mut self,time_to_freeze: bool) -> i32 {
         if self.controlled_buyo == None {
             let a = self.pop_buyos();
             if a.0 {
@@ -190,8 +181,6 @@ impl BlockStacker<BType> for Game {
             self.spawn_c_buyo((b1, b2));
             return 0;
         }
-
-        // let a = self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }); // gravity on buyo
         // interpolate this on graphics
         if time_to_freeze {
             self.freeze_c_buyo();
