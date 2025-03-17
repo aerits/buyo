@@ -7,3 +7,4 @@
 - make better graphics
 - create custom font
 - add tetrio quickplay v1
+- make size of display relative to the window size

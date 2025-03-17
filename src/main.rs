@@ -21,10 +21,14 @@ fn main() {
     wasm_logger::init(wasm_logger::Config::default());
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     let mut window = MyWindowHandler::new();
-    log::info!("version 69");
+    log::info!("version 79");
     wasm_bindgen_futures::spawn_local(async move {
+        let mut last_check = 0;
         while window.assets.font.is_none() {
-            window.assets.load().await;
+            if get_current_time() - last_check > 1000 {
+                window.assets.load().await;
+                last_check = get_current_time();
+            }
         }
         WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
     });
@@ -134,16 +138,20 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
 struct Assets {
     client: Client,
     font: Option<Font>,
+    site_url: String,
 }
 impl Assets {
     pub fn new() -> Assets {
+        let win = web_sys::window().unwrap();
+        let url = win.document().unwrap().url().unwrap();
         Assets {
             client: Client::new(),
             font: None,
+            site_url: url,
         }
     }
     pub async fn load(&mut self) {
-        let resp = Assets::load_var("/static/assets/fonts/arial.ttf").await;
+        let resp = self.load_var("/static/assets/fonts/arial.ttf").await;
         match resp {
             Some(x) => {
                 if x.status().is_success() {
@@ -165,11 +173,11 @@ impl Assets {
             }
         }
     }
-    async fn load_var(url: &str) -> Option<Response> {
+    async fn load_var(&self, url: &str) -> Option<Response> {
         let client = Client::new();
         log::info!("working");
         let response = match client
-            .get("http://localhost:5000".to_owned() + url)
+            .get(self.site_url.clone() + url)
             .send()
             .await
         {
