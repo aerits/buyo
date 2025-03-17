@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = "performance")]
+    #[allow(non_camel_case_types)]
     pub type performance;
 
     #[wasm_bindgen(static_method_of = performance)]

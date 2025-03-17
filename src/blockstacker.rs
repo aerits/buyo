@@ -14,5 +14,7 @@ pub trait BlockStacker<T> {
     fn hard_drop(&mut self);
     fn move_c_buyo_down(&mut self) -> bool;
     fn is_on_ground(&self) -> bool;
-    fn game_loop(&mut self, time_to_freeze: bool) -> bool;
+    fn score(&self) -> i32;
+    fn total_score(&self) -> i32;
+    fn game_loop(&mut self, time_to_freeze: bool) -> i32;
 }

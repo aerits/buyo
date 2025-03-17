@@ -29,10 +29,49 @@ struct Buyo {
     t: BType,
 }
 
+struct Tables {
+    color_bonus_table: Vec<i32>,
+    group_bonus_table: Vec<i32>,
+    chain_power_table: Vec<i32>,
+}
+
+// tables are all hardcoded and will not change
+impl Tables {
+    pub fn new() -> Tables {
+        Tables { 
+            color_bonus_table: vec![0, 3, 6, 12, 24], 
+            group_bonus_table: vec![0, 2, 3, 4, 5, 6, 7, 10], 
+            chain_power_table: vec![0, 8, 16, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 480, 512, 544, 576, 608, 640, 672] 
+        }
+    }
+    fn get_item_in_table(&self, i: i32, table: &Vec<i32>) -> i32 {
+        if i as usize > table.len() {
+            *table.last().unwrap()
+        } else {
+            table[i as usize]
+        }
+    }
+    pub fn get_cb(&self, i: i32) -> i32 {
+        self.get_item_in_table(i, &self.color_bonus_table)
+    }
+    pub fn get_gb(&self, i: i32) -> i32 {
+        self.get_item_in_table(i, &self.group_bonus_table)
+    }
+    pub fn get_cp(&self, i: i32) -> i32 {
+        self.get_item_in_table(i, &self.chain_power_table)
+    }
+}
+
 pub struct Game {
     buyos: HashMap<BVec, BType>,
     controlled_buyo: Option<(Buyo, Buyo)>,
     randomizer: Randomizer,
+    puyos_cleared: i32,
+    chain_power: i32, // indice for table
+    group_bonus: Vec<i32>, // list of indices for table
+    color_bonus: HashSet<BType>, // len is indice for table
+    tables: Tables,
+    total_score: i32,
 }
 
 impl BlockStacker<BType> for Game {
@@ -50,6 +89,12 @@ impl BlockStacker<BType> for Game {
             buyos,
             controlled_buyo: None,
             randomizer,
+            puyos_cleared: 0,
+            chain_power: 0,
+            group_bonus: Vec::new(),
+            color_bonus: HashSet::new(),
+            tables: Tables::new(),
+            total_score: 0,
         }
     }
     fn get_board(&self) -> HashMap<BVec, BType> {
@@ -99,6 +144,22 @@ impl BlockStacker<BType> for Game {
             None => false,
         }
     }
+    fn score(&self) -> i32 {
+        return (10 * self.puyos_cleared) * 
+            (self.tables.get_cp(self.chain_power) + 
+            self.tables.get_cb(self.color_bonus.len() as i32) + 
+            match self.group_bonus
+                        .iter()
+                        .cloned()
+                        .reduce(|total: i32, current: i32| total + self.tables.get_gb(current)) {
+                Some(x) => {x},
+                None => {0},
+            }
+        );
+    }
+    fn total_score(&self) -> i32 {
+        return self.total_score;
+    }
     // place this in a loop that also does detection of inputs and whatnot
     // returns not on floor
     fn game_loop(
@@ -106,17 +167,18 @@ impl BlockStacker<BType> for Game {
         // dt: i32,
         time_to_freeze: bool,
         // successful_update: &mut bool,
-    ) -> bool {
+    ) -> i32 {
         // if dt < 1 {
         //     return true;
         // } // only update if change in time is 1
         // *successful_update = true;
         if self.controlled_buyo == None {
             let a = self.pop_buyos();
-            if a {
-                return true;
+            if a.0 {
+                return 0;
             }
             // no more buyos to pop
+            self.reset_chain();
             let b1 = Buyo {
                 p: BVec { x: 3, y: 2 },
                 t: to_btype(self.randomizer.next()),
@@ -126,16 +188,16 @@ impl BlockStacker<BType> for Game {
                 t: to_btype(self.randomizer.next()),
             };
             self.spawn_c_buyo((b1, b2));
-            return true;
+            return 0;
         }
 
         // let a = self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }); // gravity on buyo
         // interpolate this on graphics
         if time_to_freeze {
             self.freeze_c_buyo();
-            return true;
+            return 0;
         }
-        return true;
+        return 0;
     }
 }
 
@@ -278,12 +340,13 @@ impl Game {
     }
     // pop the buyos that are 4 or more of the same color connecting
     // wall color does not pop
-    fn pop_buyos(&mut self) -> bool {
+    fn pop_buyos(&mut self) -> (bool, i32) {
         let a = self.gravity();
         if a {
             while self.gravity() {}
-            return true;
+            return (true, 0);
         }
+        let mut change_in_score = self.score();
         let mut has_popped: bool = false;
         for (b, c) in self.buyos.clone() {
             if &c == &BType::Wall {
@@ -314,10 +377,26 @@ impl Game {
                 for b in visited {
                     self.buyos.remove(&b);
                 }
+                self.puyos_cleared += count;
+                self.color_bonus.insert(c);
+                self.group_bonus.push(count - 4);
                 has_popped = true;
             }
         }
-        has_popped
+
+        if has_popped {
+            self.chain_power += 1;
+        }
+        change_in_score = self.score() - change_in_score;
+        self.total_score += change_in_score;
+        (has_popped, 0)
+    }
+
+    fn reset_chain(&mut self) {
+        self.puyos_cleared = 0;
+        self.color_bonus.clear();
+        self.group_bonus.clear();
+        self.chain_power = 0;
     }
 
     pub fn print_grid(&self) {
