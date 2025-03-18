@@ -4,7 +4,7 @@ use jstime::get_current_time;
 use randomizer::Randomizer;
 use reqwest::{Client, Response};
 use speedy2d::color::Color;
-use speedy2d::font::{Font, FormattedTextBlock, TextLayout, TextOptions};
+use speedy2d::font::{Font, TextLayout, TextOptions};
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
 use std::collections::HashMap;
@@ -210,14 +210,6 @@ impl MyWindowHandler {
 }
 
 impl WindowHandler for MyWindowHandler {
-    fn on_start(
-        &mut self,
-        helper: &mut WindowHelper<()>,
-        info: speedy2d::window::WindowStartupInfo,
-    ) {
-        // Create a Tokio runtime
-        
-    }
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
         match self.state {
             GameState::Gaming(ref mut game_handler) => {
