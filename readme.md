@@ -3,7 +3,7 @@ welcome guys to my github repo. this is ppte (not an acronym for anyting) and it
 
 - build by using `build.sh`
 - run the server in ./server with `flask run`
-- this depends on having cargo, and `wasm-bindgen-cli`
+- this depends on having cargo, and `wasm-bindgen-cli` and `python` and `flask`
 - the build system for wasm is really scuffed
 
 the plan is to have a webgame that is similar to tetrio but with more block stacking puzzle games. currently working on the buyo game.
