@@ -5,6 +5,8 @@ use crate::vectors::BVec;
 pub trait BlockStacker<T> {
     fn new(width: i32, height: i32, randomizer: Randomizer) -> Self;
     fn get_board(&self) -> HashMap<BVec, T>;
+    fn next_queue(&mut self) -> HashMap<BVec, T>;
+    fn convert_t_to_speedy2d_color(&self, t: T) -> speedy2d::color::Color;
     fn get_controlled_block(&self) -> HashMap<BVec, T>;
     fn input_left(&mut self);
     fn input_right(&mut self);

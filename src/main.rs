@@ -2,7 +2,9 @@ use blockstacker::BlockStacker;
 use buyo_game::{BType, Game};
 use jstime::get_current_time;
 use randomizer::Randomizer;
+use reqwest::blocking::get;
 use reqwest::{Client, Response};
+use reqwest_websocket::{RequestBuilderExt, WebSocket};
 use speedy2d::color::Color;
 use speedy2d::font::{Font, TextLayout, TextOptions};
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
@@ -20,9 +22,11 @@ fn main() {
 
     wasm_logger::init(wasm_logger::Config::default());
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-    let mut window = MyWindowHandler::new();
+
     log::info!("version 79");
     wasm_bindgen_futures::spawn_local(async move {
+        let mut nc = NetworkConnection::new().await.unwrap();
+        let mut window = MyWindowHandler::new(nc);
         let mut last_check = 0;
         while window.assets.font.is_none() {
             if get_current_time() - last_check > 1000 {
@@ -39,6 +43,40 @@ mod buyo_game;
 mod jstime;
 mod randomizer;
 mod vectors;
+
+struct NetworkConnection {
+    ws: WebSocket,
+    recieved_messages: Vec<(String, u64)>,
+}
+
+impl NetworkConnection {
+    pub async fn new() -> Result<NetworkConnection, reqwest_websocket::Error> {
+        Ok(NetworkConnection {
+            ws: NetworkConnection::connect().await?,
+            recieved_messages: Vec::new(),
+        })
+    }
+    pub async fn connect() -> Result<WebSocket, reqwest_websocket::Error> {
+        let response = Client::default()
+            .get("wss://echo.websocket.org/")
+            .upgrade() // Prepares the WebSocket upgrade.
+            .send()
+            .await?;
+        let web_socket = response.into_websocket().await?;
+
+        Ok(web_socket)
+    }
+    pub fn reciever(&mut self) {
+        let mut last_update = get_current_time();
+        loop {
+            if get_current_time() - last_update < 1000 {
+                continue;
+            }
+            last_update = get_current_time();
+            self.ws.try_next()
+        }
+    }
+}
 
 enum GameState {
     Gaming(GameHandler<Game, BType>),
@@ -86,7 +124,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
         auto_repeating_keys: &mut HashMap<VirtualKeyCode, u64>,
     ) {
         for (key, time) in &auto_repeating_keys.clone() {
-            if *current_time - *time > self.das {
+            if *current_time - *time > self.das && (*current_time - *time) % self.arr == 0 {
                 match key {
                     VirtualKeyCode::Left => self.game.input_left(),
                     VirtualKeyCode::Right => self.game.input_right(),
@@ -133,6 +171,100 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             }
         }
     }
+    pub fn draw(
+        &mut self,
+        graphics: &mut Graphics2D,
+        assets: &Assets,
+        pressed_down_keys: &mut HashMap<VirtualKeyCode, u64>,
+        auto_repeating_keys: &mut HashMap<VirtualKeyCode, u64>,
+    ) {
+        //////////////////////////////////////////////// HANDLE INPUTS
+        let current_time = get_current_time();
+        self.handle_inputs(&current_time, pressed_down_keys, auto_repeating_keys);
+
+        ///////////////////////////////////////////////// HANDLE GAME LOGIC
+        if current_time - self.last_update_time > 500 {
+            // game_handler.game.print_grid();
+            self.game.game_loop(self.is_time_to_freeze);
+            self.last_update_time = current_time;
+        }
+        if current_time - self.last_fall_time > self.gravity {
+            self.last_fall_time = current_time;
+            self.block_offset += self.block_offset_dy;
+            if self.block_offset >= 20.0 {
+                // diameter of block
+                self.game.move_c_buyo_down();
+                self.block_offset = 0.0;
+            }
+            // println!("{}", self.fps);
+            // self.fps = 0;
+        }
+        // self.fps += 1;
+
+        if self.game.is_on_ground() {
+            self.block_offset = 0.0;
+            match self.timestamp_when_on_ground {
+                Some(timestamp) => {
+                    if current_time - timestamp > self.freeze_time {
+                        self.timestamp_when_on_ground = None;
+                        self.is_time_to_freeze = true;
+                    }
+                }
+                None => {
+                    self.timestamp_when_on_ground = Some(get_current_time());
+                }
+            }
+        } else {
+            self.is_time_to_freeze = false;
+            self.timestamp_when_on_ground = None;
+        }
+
+        /////////////////////////////////////////// HANDLE DRAWING THE GAME
+        graphics.clear_screen(Color::WHITE);
+        // graphics.draw_circle((100.0, 100.0), 75.0, Color::BLUE);
+        for (v, c) in self.game.get_board() {
+            graphics.draw_circle(
+                (v.x as f32 * 20.0 + 20.0, v.y as f32 * 20.0 + 20.0),
+                10.0,
+                self.game.convert_t_to_speedy2d_color(c),
+            );
+        }
+        for (v, c) in self.game.get_controlled_block() {
+            graphics.draw_circle(
+                (
+                    v.x as f32 * 20.0 + 20.0,
+                    v.y as f32 * 20.0 + 20.0 + self.block_offset,
+                ),
+                10.0,
+                self.game.convert_t_to_speedy2d_color(c),
+            );
+        }
+        // next queue
+        // let (a, b) = self.game.next_buyo();
+        for (v, c) in self.game.next_queue() {
+            graphics.draw_circle(
+                (200.0, 90.0 + (v.y * 20) as f32),
+                10.0,
+                self.game.convert_t_to_speedy2d_color(c),
+            );
+        }
+
+        let score = assets.font.as_ref().unwrap().layout_text(
+            &format!("{}", self.game.total_score()),
+            50.0,
+            TextOptions::new(),
+        );
+        let chainscore = assets.font.as_ref().unwrap().layout_text(
+            &format!("{}", self.game.score()),
+            50.0,
+            TextOptions::new(),
+        );
+        graphics.draw_text((200.0, 130.0), Color::BLACK, &score);
+        graphics.draw_text((200.0, 170.0), Color::BLACK, &chainscore);
+        // log::info!("{}", self.game.score());
+
+        // log::info!("{}", get_current_time());
+    }
 }
 
 struct Assets {
@@ -158,8 +290,11 @@ impl Assets {
                     match x.bytes().await {
                         Ok(x) => {
                             self.font = match Font::new(&x) {
-                                Ok(x) => {Some(x)},
-                                Err(e) => {log::info!("error: {}", e); None},
+                                Ok(x) => Some(x),
+                                Err(e) => {
+                                    log::info!("error: {}", e);
+                                    None
+                                }
                             };
                         }
                         Err(x) => {
@@ -174,18 +309,11 @@ impl Assets {
         }
     }
     async fn load_var(&self, url: &str) -> Option<Response> {
-        let client = Client::new();
-        log::info!("working");
-        let response = match client
-            .get(self.site_url.clone() + url)
-            .send()
-            .await
-        {
+        let request = Client::new().get(self.site_url.clone() + url);
+        let result = request.send().await;
+        let response = match result {
             Ok(x) => x,
-            Err(e) => {
-                log::info!("error: {}", e);
-                return None;
-            }
+            Err(_) => return None,
         };
         return Some(response);
     }
@@ -196,15 +324,17 @@ struct MyWindowHandler {
     pressed_down_keys: HashMap<VirtualKeyCode, u64>,
     auto_repeating_keys: HashMap<VirtualKeyCode, u64>,
     assets: Assets,
+    net: NetworkConnection,
 }
 
 impl MyWindowHandler {
-    pub fn new() -> MyWindowHandler {
+    pub fn new(net: NetworkConnection) -> MyWindowHandler {
         MyWindowHandler {
             state: GameState::LoadingAssets,
             pressed_down_keys: HashMap::new(),
             auto_repeating_keys: HashMap::new(),
             assets: Assets::new(),
+            net,
         }
     }
 }
@@ -213,92 +343,13 @@ impl WindowHandler for MyWindowHandler {
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
         match self.state {
             GameState::Gaming(ref mut game_handler) => {
-                // log::info!("version 75");
-                //////////////////////////////////////////////// HANDLE INPUTS
-                let current_time = get_current_time();
-                game_handler.handle_inputs(
-                    &current_time,
+                game_handler.draw(
+                    graphics,
+                    &self.assets,
                     &mut self.pressed_down_keys,
                     &mut self.auto_repeating_keys,
                 );
-
-                ///////////////////////////////////////////////// HANDLE GAME LOGIC
-                if current_time - game_handler.last_update_time > 500 {
-                    // game_handler.game.print_grid();
-                    game_handler.game.game_loop(game_handler.is_time_to_freeze);
-                    game_handler.last_update_time = current_time;
-                }
-                if current_time - game_handler.last_fall_time > game_handler.gravity {
-                    game_handler.last_fall_time = current_time;
-                    game_handler.block_offset += game_handler.block_offset_dy;
-                    if game_handler.block_offset >= 20.0 {
-                        // diameter of block
-                        game_handler.game.move_c_buyo_down();
-                        game_handler.block_offset = 0.0;
-                    }
-                    // println!("{}", game_handler.fps);
-                    // game_handler.fps = 0;
-                }
-                // game_handler.fps += 1;
-
-                if game_handler.game.is_on_ground() {
-                    game_handler.block_offset = 0.0;
-                    match game_handler.timestamp_when_on_ground {
-                        Some(timestamp) => {
-                            if current_time - timestamp > game_handler.freeze_time {
-                                game_handler.timestamp_when_on_ground = None;
-                                game_handler.is_time_to_freeze = true;
-                            }
-                        }
-                        None => {
-                            game_handler.timestamp_when_on_ground = Some(get_current_time());
-                        }
-                    }
-                } else {
-                    game_handler.is_time_to_freeze = false;
-                    game_handler.timestamp_when_on_ground = None;
-                }
-
-                /////////////////////////////////////////// HANDLE DRAWING THE GAME
-                graphics.clear_screen(Color::WHITE);
-                // graphics.draw_circle((100.0, 100.0), 75.0, Color::BLUE);
-                for (v, c) in game_handler.game.get_board() {
-                    graphics.draw_circle(
-                        (v.x as f32 * 20.0 + 20.0, v.y as f32 * 20.0 + 20.0),
-                        10.0,
-                        btype_to_color(c),
-                    );
-                }
-                for (v, c) in game_handler.game.get_controlled_block() {
-                    graphics.draw_circle(
-                        (
-                            v.x as f32 * 20.0 + 20.0,
-                            v.y as f32 * 20.0 + 20.0 + game_handler.block_offset,
-                        ),
-                        10.0,
-                        btype_to_color(c),
-                    );
-                }
-                // next queue
-                let (a, b) = game_handler.game.next_buyo();
-                graphics.draw_circle((200.0, 90.0), 10.0, btype_to_color(a));
-                graphics.draw_circle((200.0, 110.0), 10.0, btype_to_color(b));
-
-                let score = self.assets.font.as_ref().unwrap().layout_text(
-                    &format!("{}", game_handler.game.total_score()),
-                    50.0,
-                    TextOptions::new(),
-                );
-                let chainscore = self.assets.font.as_ref().unwrap().layout_text(
-                    &format!("{}", game_handler.game.score()),
-                    50.0,
-                    TextOptions::new(),
-                );
-                graphics.draw_text((200.0, 130.0), Color::BLACK, &score);
-                graphics.draw_text((200.0, 170.0), Color::BLACK, &chainscore);
-                // log::info!("{}", game_handler.game.score());
                 helper.request_redraw();
-                // log::info!("{}", get_current_time());
             }
             GameState::Menu => todo!(),
             GameState::LoadingAssets => {
@@ -308,7 +359,6 @@ impl WindowHandler for MyWindowHandler {
                     helper.request_redraw();
                 }
                 log::info!("bruh");
-                
             }
         }
     }
@@ -342,16 +392,6 @@ impl WindowHandler for MyWindowHandler {
             }
             None => {}
         };
-    }
-}
-
-fn btype_to_color(b: BType) -> Color {
-    match b {
-        BType::Red => Color::RED,
-        BType::Blue => Color::BLUE,
-        BType::Green => Color::GREEN,
-        BType::Purple => Color::MAGENTA,
-        BType::Wall => Color::BLACK,
     }
 }
 
