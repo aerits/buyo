@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use speedy2d::color::Color;
+
 use crate::blockstacker::BlockStacker;
 use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
@@ -101,6 +103,13 @@ impl BlockStacker<BType> for Game {
         let a = self.buyos.clone();
         return a;
     }
+    fn next_queue(&mut self) -> HashMap<BVec, BType> {
+        let a = self.next_buyo();
+        let mut map = HashMap::new();
+        map.insert(BVec::new(0, 0), a.0.clone());
+        map.insert(BVec::new(0, 1), a.1.clone());
+        return map;
+    }
     fn get_controlled_block(&self) -> HashMap<BVec, BType> {
         let mut a = HashMap::new();
         match self.controlled_buyo {
@@ -111,6 +120,15 @@ impl BlockStacker<BType> for Game {
             None => (),
         }
         return a;
+    }
+    fn convert_t_to_speedy2d_color(&self, t: BType) -> speedy2d::color::Color {
+        match t {
+            BType::Red => Color::RED,
+            BType::Blue => Color::BLUE,
+            BType::Green => Color::GREEN,
+            BType::Purple => Color::MAGENTA,
+            BType::Wall => Color::BLACK,
+        }
     }
     fn input_left(&mut self) {
         self.move_c_buyo_if_no_collision(BVec { x: -1, y: 0 });
