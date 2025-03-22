@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::Randomizer;
+use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
 
 pub trait BlockStacker<T> {

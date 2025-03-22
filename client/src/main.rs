@@ -1,16 +1,22 @@
-use blockstacker::BlockStacker;
-use buyo_game::{BType, Game};
+use blockstackers_core::{
+    blockstacker::BlockStacker,
+    buyo_game::{BType, Game},
+    randomizer::Randomizer,
+};
 use futures::StreamExt;
 use jstime::get_current_time;
-use randomizer::Randomizer;
-use reqwest::{Client, Response};
-use reqwest_websocket::{RequestBuilderExt, WebSocket};
+// use reqwest::{Client, Response};
+// use reqwest_websocket::{RequestBuilderExt, WebSocket};
 use speedy2d::color::Color;
 use speedy2d::font::{Font, TextLayout, TextOptions};
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{
+    js_sys, wasm_bindgen::{JsCast, JsValue}, Request, RequestInit, RequestMode, Response
+};
 
 fn main() {
     // let window = Window::new_centered("Title", (640, 480)).unwrap();
@@ -25,8 +31,8 @@ fn main() {
 
     log::info!("version 79");
     wasm_bindgen_futures::spawn_local(async move {
-        let mut nc = NetworkConnection::new().await.unwrap();
-        let mut window = MyWindowHandler::new(nc);
+        // let mut nc = NetworkConnection::new().await.unwrap();
+        let mut window = MyWindowHandler::new(NetworkConnection {});
         let mut last_check = 0;
         while window.assets.font.is_none() {
             if get_current_time() - last_check > 1000 {
@@ -38,48 +44,44 @@ fn main() {
     });
 }
 
-mod blockstacker;
-mod buyo_game;
 mod jstime;
-mod randomizer;
-mod vectors;
 
 struct NetworkConnection {
-    ws: WebSocket,
-    recieved_messages: Vec<(String, u64)>,
+    // ws: WebSocket,
+    // recieved_messages: Vec<(String, u64)>,
 }
 
-impl NetworkConnection {
-    pub async fn new() -> Result<NetworkConnection, reqwest_websocket::Error> {
-        Ok(NetworkConnection {
-            ws: NetworkConnection::connect().await?,
-            recieved_messages: Vec::new(),
-        })
-    }
-    pub async fn connect() -> Result<WebSocket, reqwest_websocket::Error> {
-        let response = Client::default()
-            .get("wss://echo.websocket.org/")
-            .upgrade() // Prepares the WebSocket upgrade.
-            .send()
-            .await?;
-        let web_socket = response.into_websocket().await?;
+// impl NetworkConnection {
+//     pub async fn new() -> Result<NetworkConnection, reqwest_websocket::Error> {
+//         Ok(NetworkConnection {
+//             ws: NetworkConnection::connect().await?,
+//             recieved_messages: Vec::new(),
+//         })
+//     }
+//     pub async fn connect() -> Result<WebSocket, reqwest_websocket::Error> {
+//         let response = Client::default()
+//             .get("wss://echo.websocket.org/")
+//             .upgrade() // Prepares the WebSocket upgrade.
+//             .send()
+//             .await?;
+//         let web_socket = response.into_websocket().await?;
 
-        Ok(web_socket)
-    }
-    pub async fn reciever(&mut self) {
-        let mut last_update = get_current_time();
-        loop {
-            if get_current_time() - last_update < 1000 {
-                continue;
-            }
-            last_update = get_current_time();
-            let a = match self.ws.next().await {
-                Some(x) => {x},
-                None => {continue},
-            };
-        }
-    }
-}
+//         Ok(web_socket)
+//     }
+//     pub async fn reciever(&mut self) {
+//         let mut last_update = get_current_time();
+//         loop {
+//             if get_current_time() - last_update < 1000 {
+//                 continue;
+//             }
+//             last_update = get_current_time();
+//             let a = match self.ws.next().await {
+//                 Some(x) => {x},
+//                 None => {continue},
+//             };
+//         }
+//     }
+// }
 
 enum GameState {
     Gaming(GameHandler<Game, BType>),
@@ -105,14 +107,18 @@ struct GameHandler<T: BlockStacker<F>, F> {
 impl<T: BlockStacker<F>, F> GameHandler<T, F> {
     pub fn new(width: i32, height: i32) -> GameHandler<T, F> {
         GameHandler {
-            game: T::new(width, height, Randomizer::new(4)),
+            game: T::new(
+                width,
+                height,
+                Randomizer::new(4, get_current_time() as u128),
+            ),
             phantom: PhantomData,
             last_update_time: get_current_time(),
             is_time_to_freeze: false,
             freeze_time: 5000,
             timestamp_when_on_ground: None, // this says if its on the ground when did it land
-            das: 133,                       // 120 ms
-            arr: 20,                        // 20 ms
+            das: 133,                       // 133 ms
+            arr: 10,                        // 10 ms
             last_fall_time: get_current_time(),
             gravity: 1,
             block_offset: 0.0, // this lets the buyos move down smoothly instead of moving a whole block down
@@ -127,7 +133,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
         auto_repeating_keys: &mut HashMap<VirtualKeyCode, u64>,
     ) {
         for (key, time) in &auto_repeating_keys.clone() {
-            if *current_time - *time > self.das && (*current_time - *time) % self.arr == 0 {
+            if *current_time - *time > self.das && (*current_time - *time - self.das) % self.arr == 0 {
                 match key {
                     VirtualKeyCode::Left => self.game.input_left(),
                     VirtualKeyCode::Right => self.game.input_right(),
@@ -271,7 +277,6 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
 }
 
 struct Assets {
-    client: Client,
     font: Option<Font>,
     site_url: String,
 }
@@ -280,7 +285,6 @@ impl Assets {
         let win = web_sys::window().unwrap();
         let url = win.document().unwrap().url().unwrap();
         Assets {
-            client: Client::new(),
             font: None,
             site_url: url,
         }
@@ -289,36 +293,47 @@ impl Assets {
         let resp = self.load_var("/static/assets/fonts/arial.ttf").await;
         match resp {
             Some(x) => {
-                if x.status().is_success() {
-                    match x.bytes().await {
-                        Ok(x) => {
-                            self.font = match Font::new(&x) {
-                                Ok(x) => Some(x),
-                                Err(e) => {
-                                    log::info!("error: {}", e);
-                                    None
-                                }
-                            };
-                        }
-                        Err(x) => {
-                            log::info!("error: {}", x)
-                        }
-                    };
-                }
+                self.font = match Font::new(&x) {
+                    Ok(x) => Some(x),
+                    Err(e) => {
+                        log::info!("error: {}", e);
+                        None
+                    }
+                };
             }
             None => {
                 log::info!("server didn't respond")
             }
         }
     }
-    async fn load_var(&self, url: &str) -> Option<Response> {
-        let request = Client::new().get(self.site_url.clone() + url);
-        let result = request.send().await;
-        let response = match result {
-            Ok(x) => x,
-            Err(_) => return None,
-        };
-        return Some(response);
+    async fn load_var(&self, url: &str) -> Option<Vec<u8>> {
+        // Create a new RequestInit object
+        let mut opts = RequestInit::new();
+        opts.set_method("GET");
+
+        // Create a new Request object
+        let request = Request::new_with_str_and_init(url, &opts).unwrap();
+
+        // Use the fetch API to make the request
+        let window = web_sys::window().unwrap();
+        let response_promise = window.fetch_with_request(&request);
+
+        // Await the response using JsFuture
+        let response_value = JsFuture::from(response_promise).await.unwrap();
+        let response: Response = response_value.dyn_into().unwrap();
+
+        // Check if the response is OK
+        if response.ok() {
+            // Get the response body as a Uint8Array
+            let promise = response.array_buffer();
+            let array_buffer = JsFuture::from(promise.unwrap()).await.unwrap();
+            let bytes = js_sys::Uint8Array::new(&array_buffer);
+            let mut vec = vec![0; bytes.length() as usize];
+            bytes.copy_to(&mut vec[..]);
+            Some(vec)
+        } else {
+            None
+        }
     }
 }
 
