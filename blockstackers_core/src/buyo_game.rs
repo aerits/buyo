@@ -183,12 +183,12 @@ impl BlockStacker<BType> for Game {
         return self.total_score;
     }
     // place this in a loop that also does detection of inputs and whatnot
-    // returns not on floor
+    // returns 1 if it just ran gravity
     fn game_loop(&mut self, time_to_freeze: bool) -> i32 {
         if self.controlled_buyo == None {
             let a = self.pop_buyos();
             if a.0 {
-                return 0;
+                return a.1;
             }
             // no more buyos to pop
             self.reset_chain();
@@ -355,7 +355,7 @@ impl Game {
         let a = self.gravity();
         if a {
             while self.gravity() {}
-            return (true, 0);
+            return (true, 1);
         }
         self.color_bonus.clear();
         self.group_bonus.clear();

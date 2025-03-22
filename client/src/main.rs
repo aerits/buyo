@@ -192,7 +192,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
         self.handle_inputs(&current_time, pressed_down_keys, auto_repeating_keys);
 
         ///////////////////////////////////////////////// HANDLE GAME LOGIC
-        if current_time - self.last_update_time > 500 {
+        if current_time - self.last_update_time > 300 {
             // game_handler.game.print_grid();
             self.game.game_loop(self.is_time_to_freeze);
             self.last_update_time = current_time;
