@@ -1,7 +1,5 @@
 use oorandom::Rand64;
 
-use crate::jstime::get_current_time;
-
 pub struct Randomizer {
     queue: Vec<i32>,
     max: i32,
@@ -10,8 +8,8 @@ pub struct Randomizer {
 }
 
 impl Randomizer {
-    pub fn new(max: i32) -> Randomizer {
-        let rng = oorandom::Rand64::new(get_current_time() as u128);
+    pub fn new(max: i32, seed: u128) -> Randomizer {
+        let rng = Rand64::new(seed);
         Randomizer { queue: Vec::new(), max, current: 0, rng }
     }
     pub fn get(&mut self, i: i32) -> i32 {

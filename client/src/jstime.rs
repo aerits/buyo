@@ -1,4 +1,5 @@
 use wasm_bindgen::prelude::*;
+use web_sys::wasm_bindgen;
 
 #[wasm_bindgen]
 extern "C" {
