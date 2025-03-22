@@ -15,3 +15,7 @@ pub fn get_current_time() -> u64 {
     // Get the current time in milliseconds and convert to nanoseconds
     (performance::now()) as u64
 }
+
+// pub fn get_current_time() -> u64 {
+//     return 0;
+// }
