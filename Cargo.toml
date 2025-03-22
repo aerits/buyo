@@ -1,2 +1,3 @@
 [workspace]
-members = ["client", "blockstackers_core"]
+members = ["client", "blockstackers_core", "rserver"]
+resolver = "2"
