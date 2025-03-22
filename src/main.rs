@@ -1,5 +1,6 @@
 use blockstacker::BlockStacker;
 use buyo_game::{BType, Game};
+use futures::StreamExt;
 use jstime::get_current_time;
 use randomizer::Randomizer;
 use reqwest::blocking::get;
@@ -66,14 +67,17 @@ impl NetworkConnection {
 
         Ok(web_socket)
     }
-    pub fn reciever(&mut self) {
+    pub async fn reciever(&mut self) {
         let mut last_update = get_current_time();
         loop {
             if get_current_time() - last_update < 1000 {
                 continue;
             }
             last_update = get_current_time();
-            self.ws.try_next()
+            let a = match self.ws.next().await {
+                Some(x) => {x},
+                None => {continue},
+            };
         }
     }
 }
