@@ -2,3 +2,4 @@
 /server/static
 /server/__pycache__
 /server/.venv
+/rserver/static

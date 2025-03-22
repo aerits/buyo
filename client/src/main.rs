@@ -290,7 +290,7 @@ impl Assets {
         }
     }
     pub async fn load(&mut self) {
-        let resp = self.load_var("/static/assets/fonts/arial.ttf").await;
+        let resp = self.load_var("/assets/fonts/arial.ttf").await;
         match resp {
             Some(x) => {
                 self.font = match Font::new(&x) {
