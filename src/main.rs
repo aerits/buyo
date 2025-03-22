@@ -3,7 +3,6 @@ use buyo_game::{BType, Game};
 use futures::StreamExt;
 use jstime::get_current_time;
 use randomizer::Randomizer;
-use reqwest::blocking::get;
 use reqwest::{Client, Response};
 use reqwest_websocket::{RequestBuilderExt, WebSocket};
 use speedy2d::color::Color;
