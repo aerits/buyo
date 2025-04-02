@@ -118,7 +118,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             freeze_time: 5000,
             timestamp_when_on_ground: None, // this says if its on the ground when did it land
             das: 133,                       // 133 ms
-            arr: 10,                        // 10 ms
+            arr: 1,                        // 10 ms
             last_fall_time: get_current_time(),
             gravity: 1,
             block_offset: 0.0, // this lets the buyos move down smoothly instead of moving a whole block down
@@ -133,7 +133,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
         auto_repeating_keys: &mut HashMap<VirtualKeyCode, u64>,
     ) {
         for (key, time) in &auto_repeating_keys.clone() {
-            if *current_time - *time > self.das && (*current_time - *time - self.das) % self.arr == 0 {
+            if *current_time - *time > self.das && (*current_time - *time) % self.arr < 1 {
                 match key {
                     VirtualKeyCode::Left => self.game.input_left(),
                     VirtualKeyCode::Right => self.game.input_right(),
@@ -203,7 +203,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             if self.block_offset >= 20.0 {
                 // diameter of block
                 self.game.move_c_buyo_down();
-                self.block_offset = 0.0;
+                self.block_offset -= 20.0;
             }
             // println!("{}", self.fps);
             // self.fps = 0;
@@ -217,6 +217,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
                     if current_time - timestamp > self.freeze_time {
                         self.timestamp_when_on_ground = None;
                         self.is_time_to_freeze = true;
+                        self.last_update_time = 0;
                     }
                 }
                 None => {
