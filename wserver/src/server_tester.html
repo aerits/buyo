@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
+        #input { width: 80%; }
+    </style>
+</head>
+<body>
+    <h1>Chat App</h1>
+    <div id="messages"></div>
+    <input type="text" id="input" placeholder="Type a message..." />
+    <button id="send">Send</button>
+
+    <script>
+        const socket = new WebSocket('ws://localhost:8080');
+
+        socket.onopen = function() {
+            console.log('Connected to the chat server');
+        };
+
+        socket.onmessage = function(event) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<div>${event.data}</div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to the bottom
+        };
+
+        document.getElementById('send').onclick = function() {
+            const input = document.getElementById('input');
+            const message = input.value;
+            socket.send(message);
+            input.value = ''; // Clear the input
+        };
+    </script>
+</body>
+</html>
