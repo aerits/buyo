@@ -32,7 +32,33 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::protocol::Message;
 
 type Tx = UnboundedSender<Message>;
-type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
+type PeerMap = Arc<Mutex<State>>;
+struct State {
+    clients: HashMap<SocketAddr, Tx>,
+    client_room: HashMap<SocketAddr, String>,
+    client_stats: HashMap<SocketAddr, ClientStats>,
+    rooms: HashMap<String, Room>,
+}
+
+impl State {
+    pub fn new() -> State {
+        State {
+            clients: HashMap::new(),
+            client_room: HashMap::new(),
+            client_stats: HashMap::new(),
+            rooms: HashMap::new(),
+        }
+    }
+}
+
+struct Room {
+    name: String,
+    password: Option<String>,
+}
+
+struct ClientStats {
+    garbage_queue: u64,
+}
 
 async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: SocketAddr) {
     println!("Incoming TCP connection from: {}", addr);
@@ -44,17 +70,26 @@ async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: Socke
 
     // Insert the write part of this peer to the peer map.
     let (tx, rx) = unbounded();
-    peer_map.lock().unwrap().insert(addr, tx);
+    peer_map.lock().unwrap().clients.insert(addr, tx);
 
     let (outgoing, incoming) = ws_stream.split();
 
     let broadcast_incoming = incoming.try_for_each(|msg| {
-        println!("Received a message from {}: {}", addr, msg.to_text().unwrap());
+        println!(
+            "Received a message from {}: {}",
+            addr,
+            msg.to_text().unwrap()
+        );
         let peers = peer_map.lock().unwrap();
 
         // We want to broadcast the message to everyone except ourselves.
-        let broadcast_recipients =
-            peers.iter().filter(|(peer_addr, _)| peer_addr != &&addr).map(|(_, ws_sink)| ws_sink);
+        let broadcast_recipients = peers
+            .clients
+            .iter()
+            .filter(|(peer_addr, _)| {
+                (peer_addr != &&addr) && (peers.client_room.get(&peer_addr) == peers.client_room.get(&&addr))
+            })
+            .map(|(_, ws_sink)| ws_sink);
 
         for recp in broadcast_recipients {
             recp.unbounded_send(msg.clone()).unwrap();
@@ -69,14 +104,16 @@ async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: Socke
     future::select(broadcast_incoming, receive_from_others).await;
 
     println!("{} disconnected", &addr);
-    peer_map.lock().unwrap().remove(&addr);
+    peer_map.lock().unwrap().clients.remove(&addr);
 }
 
 #[tokio::main]
 async fn main() -> Result<(), IoError> {
-    let addr = env::args().nth(1).unwrap_or_else(|| "127.0.0.1:8080".to_string());
+    let addr = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
-    let state = PeerMap::new(Mutex::new(HashMap::new()));
+    let state = PeerMap::new(Mutex::new(State::new()));
 
     // Create the event loop and TCP listener we'll accept connections on.
     let try_socket = TcpListener::bind(&addr).await;
