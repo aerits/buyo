@@ -70,11 +70,11 @@ impl Tables {
     }
 }
 
-pub struct Game {
+pub struct BuyoBuyo {
     buyos: HashMap<BVec, BType>,
     controlled_buyo: Option<(Buyo, Buyo)>,
     randomizer: Randomizer,
-    puyos_cleared: i32,
+    puyos_cleared: i32,          // -- for scoring --
     chain_power: i32,            // indice for table
     group_bonus: Vec<i32>,       // list of indices for table
     color_bonus: HashSet<BType>, // len is indice for table
@@ -82,7 +82,7 @@ pub struct Game {
     total_score: i32,
 }
 
-impl BlockStacker<BType> for Game {
+impl BlockStacker<BType> for BuyoBuyo {
     // create a game board
     fn new(width: i32, height: i32, randomizer: Randomizer) -> Self {
         let mut buyos = HashMap::new();
@@ -93,7 +93,7 @@ impl BlockStacker<BType> for Game {
                 }
             }
         }
-        Game {
+        BuyoBuyo {
             buyos,
             controlled_buyo: None,
             randomizer,
@@ -212,7 +212,7 @@ impl BlockStacker<BType> for Game {
     }
 }
 
-impl Game {
+impl BuyoBuyo {
     // set controlled buyo to the inputted buyo
     // if there already is a buyo return false
     fn spawn_c_buyo(&mut self, b: (Buyo, Buyo)) -> bool {

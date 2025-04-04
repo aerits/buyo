@@ -1,6 +1,6 @@
 use blockstackers_core::{
     blockstacker::BlockStacker,
-    buyo_game::{BType, Game},
+    buyo_game::{BType, BuyoBuyo},
     randomizer::Randomizer,
 };
 use futures::StreamExt;
@@ -11,7 +11,7 @@ use speedy2d::color::Color;
 use speedy2d::font::{Font, TextLayout, TextOptions};
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::{Deref, DerefMut}, rc::Rc};
 use std::marker::PhantomData;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -32,7 +32,8 @@ fn main() {
     log::info!("version 79");
     wasm_bindgen_futures::spawn_local(async move {
         // let mut nc = NetworkConnection::new().await.unwrap();
-        let mut window = MyWindowHandler::new(NetworkConnection {});
+        let mut state = Rc::new(GameState::LoadingAssets);
+        let mut window = MyWindowHandler::new(NetworkConnection {}, state);
         let mut last_check = 0;
         while window.assets.font.is_none() {
             if get_current_time() - last_check > 1000 {
@@ -51,40 +52,12 @@ struct NetworkConnection {
     // recieved_messages: Vec<(String, u64)>,
 }
 
-// impl NetworkConnection {
-//     pub async fn new() -> Result<NetworkConnection, reqwest_websocket::Error> {
-//         Ok(NetworkConnection {
-//             ws: NetworkConnection::connect().await?,
-//             recieved_messages: Vec::new(),
-//         })
-//     }
-//     pub async fn connect() -> Result<WebSocket, reqwest_websocket::Error> {
-//         let response = Client::default()
-//             .get("wss://echo.websocket.org/")
-//             .upgrade() // Prepares the WebSocket upgrade.
-//             .send()
-//             .await?;
-//         let web_socket = response.into_websocket().await?;
-
-//         Ok(web_socket)
-//     }
-//     pub async fn reciever(&mut self) {
-//         let mut last_update = get_current_time();
-//         loop {
-//             if get_current_time() - last_update < 1000 {
-//                 continue;
-//             }
-//             last_update = get_current_time();
-//             let a = match self.ws.next().await {
-//                 Some(x) => {x},
-//                 None => {continue},
-//             };
-//         }
-//     }
-// }
+impl NetworkConnection {
+    
+}
 
 enum GameState {
-    Gaming(GameHandler<Game, BType>),
+    Gaming(GameHandler<BuyoBuyo, BType>),
     Menu,
     LoadingAssets,
 }
@@ -339,7 +312,7 @@ impl Assets {
 }
 
 struct MyWindowHandler {
-    state: GameState,
+    state: Rc<GameState>,
     pressed_down_keys: HashMap<VirtualKeyCode, u64>,
     auto_repeating_keys: HashMap<VirtualKeyCode, u64>,
     assets: Assets,
@@ -347,9 +320,9 @@ struct MyWindowHandler {
 }
 
 impl MyWindowHandler {
-    pub fn new(net: NetworkConnection) -> MyWindowHandler {
+    pub fn new(net: NetworkConnection, state: Rc<GameState>) -> MyWindowHandler {
         MyWindowHandler {
-            state: GameState::LoadingAssets,
+            state: state,
             pressed_down_keys: HashMap::new(),
             auto_repeating_keys: HashMap::new(),
             assets: Assets::new(),
@@ -360,7 +333,7 @@ impl MyWindowHandler {
 
 impl WindowHandler for MyWindowHandler {
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
-        match self.state {
+        match self.state.deref() {
             GameState::Gaming(ref mut game_handler) => {
                 game_handler.draw(
                     graphics,
@@ -374,7 +347,7 @@ impl WindowHandler for MyWindowHandler {
             GameState::LoadingAssets => {
                 if self.assets.font.is_some() {
                     log::info!("gaming");
-                    self.state = GameState::Gaming(GameHandler::new(6, 12));
+                    self.state = Rc::new(GameState::Gaming(GameHandler::new(6, 12)));
                     helper.request_redraw();
                 }
                 log::info!("bruh");

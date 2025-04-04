@@ -1,16 +1,16 @@
 use crate::{blockstacker::BlockStacker, randomizer};
 
 use super::BType;
-use super::Game;
+use super::BuyoBuyo;
 
 struct TestInit {
-    bg: Game,
+    bg: BuyoBuyo,
 }
 
 impl TestInit {
     pub fn init() -> TestInit {
         TestInit {
-            bg: Game::new(6, 12, randomizer::Randomizer::new(4, 69)),
+            bg: BuyoBuyo::new(6, 12, randomizer::Randomizer::new(4, 69)),
         }
     }
 }
