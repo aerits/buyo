@@ -1,6 +1,6 @@
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub struct BVec {
     pub x: i32,
     pub y: i32,
@@ -31,5 +31,13 @@ impl Add for &BVec {
 
     fn add(self, rhs: Self) -> Self::Output {
         BVec::new(self.x + rhs.x, self.y + rhs.y)
+    }
+}
+
+impl Sub for &BVec {
+    type Output = BVec;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        BVec::new(self.x - rhs.x, self.y - rhs.y)
     }
 }

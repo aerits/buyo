@@ -14,25 +14,27 @@ mod tables;
 struct C_Mino {
     vec: Vec<BVec>,
     color: Mino,
+    shape: Shapes,
     rot: Rotation,
 }
 impl C_Mino {
-    pub fn new(vec: Vec<BVec>, color: Mino) -> C_Mino {
+    pub fn new(vec: Vec<BVec>, color: Mino, shape: Shapes) -> C_Mino {
         C_Mino {
             vec,
             color,
+            shape,
             rot: Rotation::Up,
         }
     }
 }
 
-pub struct Tetr {
+pub struct Tet {
     minos: HashMap<BVec, Mino>,
     randomizer: Randomizer,
     controlled_mino: Option<C_Mino>,
     tables: Tables,
 }
-impl Tetr {
+impl Tet {
     fn spawn_c_mino(&mut self, shape: Shapes) {
         let o = vec![
             BVec::new(0, 0),
@@ -42,7 +44,7 @@ impl Tetr {
         ];
 
         match shape {
-            Shapes::O => self.controlled_mino = Some(C_Mino::new(o, Mino::Yellow)),
+            Shapes::O => self.controlled_mino = Some(C_Mino::new(o, Mino::Yellow, shape)),
             Shapes::L => todo!(),
             Shapes::J => todo!(),
             Shapes::T => todo!(),
@@ -74,13 +76,38 @@ impl Tetr {
             }
         }
         // SRS system
-        
-        // [],
-        // ];
+        let rotation_final = match (temp.rot as i32 + rots) % 4 {
+            0 => Rotation::Up,
+            1 => Rotation::Right,
+            2 => Rotation::Down,
+            3 => Rotation::Left,
+            _ => panic!("This is an impossible state")
+        };
+        let mut kicks = self.tables.get_kicks(&temp.rot, &rotation_final, &temp.shape);
+        // reverse y coordinate because the game's systems are 0 y is the top of the screeen
+        for kick in &mut kicks {
+            kick.y = kick.y * -1;
+        }
+        // test each kick until one works
+        for kick in &kicks {
+            let mut pos = temp.vec.clone();
+            let mut collided = false;
+            for v in &mut pos {
+                v.add_v(*kick);
+                if self.minos.contains_key(&v) {
+                    collided = true;
+                    break;
+                }
+            }
+            if !collided {
+                temp.vec = pos;
+                return;
+            }
+        }
     }
 }
 
-impl BlockStacker<Mino> for Tetr {
+impl BlockStacker<Mino> for Tet {
     fn new(width: i32, height: i32, randomizer: crate::randomizer::Randomizer) -> Self {
         let mut minos: HashMap<BVec, Mino> = HashMap::new();
         for i in 0..width + 2 {
@@ -91,7 +118,7 @@ impl BlockStacker<Mino> for Tetr {
             }
         }
 
-        Tetr {
+        Tet {
             minos,
             randomizer: randomizer,
             controlled_mino: None,
