@@ -32,7 +32,7 @@ fn main() {
     log::info!("version 79");
     wasm_bindgen_futures::spawn_local(async move {
         // let mut nc = NetworkConnection::new().await.unwrap();
-        let mut state = Rc::new(GameState::LoadingAssets);
+        let mut state = GameState::LoadingAssets;
         let mut window = MyWindowHandler::new(NetworkConnection {}, state);
         let mut last_check = 0;
         while window.assets.font.is_none() {
@@ -312,7 +312,7 @@ impl Assets {
 }
 
 struct MyWindowHandler {
-    state: Rc<GameState>,
+    state: GameState,
     pressed_down_keys: HashMap<VirtualKeyCode, u64>,
     auto_repeating_keys: HashMap<VirtualKeyCode, u64>,
     assets: Assets,
@@ -320,7 +320,7 @@ struct MyWindowHandler {
 }
 
 impl MyWindowHandler {
-    pub fn new(net: NetworkConnection, state: Rc<GameState>) -> MyWindowHandler {
+    pub fn new(net: NetworkConnection, state: GameState) -> MyWindowHandler {
         MyWindowHandler {
             state: state,
             pressed_down_keys: HashMap::new(),
@@ -333,7 +333,7 @@ impl MyWindowHandler {
 
 impl WindowHandler for MyWindowHandler {
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
-        match self.state.deref() {
+        match self.state {
             GameState::Gaming(ref mut game_handler) => {
                 game_handler.draw(
                     graphics,
@@ -347,7 +347,7 @@ impl WindowHandler for MyWindowHandler {
             GameState::LoadingAssets => {
                 if self.assets.font.is_some() {
                     log::info!("gaming");
-                    self.state = Rc::new(GameState::Gaming(GameHandler::new(6, 12)));
+                    self.state = GameState::Gaming(GameHandler::new(6, 12));
                     helper.request_redraw();
                 }
                 log::info!("bruh");
