@@ -1,8 +1,11 @@
 pub enum Mino {
     Red,
     Blue,
+    LightBlue,
     Yellow,
     Orange,
+    Green,
+    Purple,
     Wall,
 }
 #[derive(Clone, Copy)]
