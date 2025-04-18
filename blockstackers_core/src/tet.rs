@@ -81,9 +81,11 @@ impl Tet {
             1 => Rotation::Right,
             2 => Rotation::Down,
             3 => Rotation::Left,
-            _ => panic!("This is an impossible state")
+            _ => panic!("This is an impossible state"),
         };
-        let mut kicks = self.tables.get_kicks(&temp.rot, &rotation_final, &temp.shape);
+        let mut kicks = self
+            .tables
+            .get_kicks(&temp.rot, &rotation_final, &temp.shape);
         // reverse y coordinate because the game's systems are 0 y is the top of the screeen
         for kick in &mut kicks {
             kick.y = kick.y * -1;
@@ -127,6 +129,29 @@ impl BlockStacker<Mino> for Tet {
     }
 
     fn get_board(&self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
+        let max_x = self.minos.iter().fold(
+            0,
+            |total, cur| if cur.0.x > total { cur.0.x } else { total },
+        );
+        let max_y = self.minos.iter().fold(
+            0,
+            |total, cur| if cur.0.y > total { cur.0.y } else { total },
+        );
+        let mut grid: Vec<Vec<String>> = Vec::new();
+        for i in 0..max_y {
+            grid.push(Vec::new());
+        }
+        for (v, b) in self.minos.iter() {
+            let s = match b {
+                Mino::Red => "R",
+                Mino::Blue => "B",
+                Mino::Yellow => "Y",
+                Mino::Orange => todo!(),
+                Mino::Wall => todo!(),
+            }
+            .to_owned();
+            grid[v.y as usize][v.x as usize] = s;
+        }
         todo!()
     }
 
