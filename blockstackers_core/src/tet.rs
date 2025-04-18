@@ -37,20 +37,62 @@ pub struct Tet {
 impl Tet {
     fn spawn_c_mino(&mut self, shape: Shapes) {
         let o = vec![
-            BVec::new(0, 0),
-            BVec::new(1, 0),
-            BVec::new(1, -1),
-            BVec::new(0, -1),
+            BVec::new(5, 0),
+            BVec::new(6, 0),
+            BVec::new(6, 1),
+            BVec::new(5, 1),
+        ];
+
+        let i = vec![
+            BVec::new(4, 1),
+            BVec::new(5, 1),
+            BVec::new(6, 1),
+            BVec::new(7, 1),
+        ];
+
+        let l = vec![
+            BVec::new(4, 1),
+            BVec::new(4, 0),
+            BVec::new(5, 1),
+            BVec::new(6, 1),
+        ];
+
+        let j = vec![
+            BVec::new(4, 1),
+            BVec::new(5, 1),
+            BVec::new(6, 1),
+            BVec::new(6, 0),
+        ];
+
+        let s = vec![
+            BVec::new(4, 1),
+            BVec::new(5, 1),
+            BVec::new(5, 0),
+            BVec::new(6, 0),
+        ];
+
+        let z = vec![
+            BVec::new(4, 0),
+            BVec::new(5, 0),
+            BVec::new(5, 1),
+            BVec::new(6, 1),
+        ];
+
+        let t = vec![
+            BVec::new(4, 1),
+            BVec::new(5, 1),
+            BVec::new(5, 0),
+            BVec::new(6, 1),
         ];
 
         match shape {
             Shapes::O => self.controlled_mino = Some(C_Mino::new(o, Mino::Yellow, shape)),
-            Shapes::L => todo!(),
-            Shapes::J => todo!(),
-            Shapes::T => todo!(),
-            Shapes::I => todo!(),
-            Shapes::Z => todo!(),
-            Shapes::S => todo!(),
+            Shapes::L => self.controlled_mino = Some(C_Mino::new(l, Mino::Orange, shape)),
+            Shapes::J => self.controlled_mino = Some(C_Mino::new(j, Mino::Blue, shape)),
+            Shapes::T => self.controlled_mino = Some(C_Mino::new(t, Mino::Purple, shape)),
+            Shapes::I => self.controlled_mino = Some(C_Mino::new(i, Mino::LightBlue, shape)),
+            Shapes::Z => self.controlled_mino = Some(C_Mino::new(z, Mino::Red, shape)),
+            Shapes::S => self.controlled_mino = Some(C_Mino::new(s, Mino::Green, shape)),
         }
     }
     fn rotate_c_mino(&mut self, rots: i32) {
@@ -62,7 +104,7 @@ impl Tet {
             Mino::Yellow => return, // cannot rotate the O mino
             _ => (),
         }
-        let mut temp = c_mino;
+        let temp = c_mino;
         let mut origin = temp.vec[0].clone();
         origin.mult_s(-1);
         for v in &mut temp.vec {
@@ -106,6 +148,21 @@ impl Tet {
                 return;
             }
         }
+    }
+    fn move_c_mino_if_no_collision(&mut self, v: BVec) -> bool {
+        let mino = match &mut self.controlled_mino {
+            Some(x) => x,
+            None => return false,
+        };
+        let pos = mino.vec.clone();
+        let new_pos: Vec<BVec> = pos.iter().map(|x| x + &v).collect();
+        for vec in &new_pos {
+            if self.minos.contains_key(vec) {
+                return false;
+            }
+        }
+        mino.vec = new_pos;
+        return true;
     }
 }
 
