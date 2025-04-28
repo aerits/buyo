@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use regex::Regex;
 
 use crate::vectors::BVec;
@@ -32,23 +30,32 @@ impl Tables {
  	    (-1, 0)
         ";
         let re = Regex::new(r"(?<n1>.[0-9]).(?<n2>.[0-9])").unwrap();
-        let tetr_offset_data = re.captures_iter(tetr_offset_data_str).map(|caps| {
-            let n1_s = caps.name("n1").unwrap().as_str();
-            let n2_s = caps.name("n2").unwrap().as_str();
-            BVec::new(n1_s.trim().parse().unwrap(), n2_s.trim().parse().unwrap())
-        }).collect();
+        let tetr_offset_data = re
+            .captures_iter(tetr_offset_data_str)
+            .map(|caps| {
+                let n1_s = caps.name("n1").unwrap().as_str();
+                let n2_s = caps.name("n2").unwrap().as_str();
+                BVec::new(n1_s.trim().parse().unwrap(), n2_s.trim().parse().unwrap())
+            })
+            .collect();
 
-        let tetr_offset_data_i = re.captures_iter(tetr_offset_data_i_str).map(|caps| {
-            let n1_s = caps.name("n1").unwrap().as_str();
-            let n2_s = caps.name("n2").unwrap().as_str();
-            BVec::new(n1_s.trim().parse().unwrap(), n2_s.trim().parse().unwrap())
-        }).collect();
+        let tetr_offset_data_i = re
+            .captures_iter(tetr_offset_data_i_str)
+            .map(|caps| {
+                let n1_s = caps.name("n1").unwrap().as_str();
+                let n2_s = caps.name("n2").unwrap().as_str();
+                BVec::new(n1_s.trim().parse().unwrap(), n2_s.trim().parse().unwrap())
+            })
+            .collect();
 
-        let tetr_offset_data_o = re.captures_iter(tetr_offset_data_o_str).map(|caps| {
-            let n1_s = caps.name("n1").unwrap().as_str();
-            let n2_s = caps.name("n2").unwrap().as_str();
-            BVec::new(n1_s.trim().parse().unwrap(), n2_s.trim().parse().unwrap())
-        }).collect();
+        let tetr_offset_data_o = re
+            .captures_iter(tetr_offset_data_o_str)
+            .map(|caps| {
+                let n1_s = caps.name("n1").unwrap().as_str();
+                let n2_s = caps.name("n2").unwrap().as_str();
+                BVec::new(n1_s.trim().parse().unwrap(), n2_s.trim().parse().unwrap())
+            })
+            .collect();
 
         Tables {
             tetr_offset_data,
@@ -83,7 +90,7 @@ impl Tables {
             Rotation::Left => 3,
         }]
     }
-    pub fn get_offset(&self, shape: Shapes, r:Rotation, offset: usize) -> BVec {
+    pub fn get_offset(&self, shape: Shapes, r: Rotation, offset: usize) -> BVec {
         match shape {
             Shapes::I => self.get_offset_i(r, offset),
             Shapes::O => {
@@ -91,7 +98,7 @@ impl Tables {
                     return BVec::new(0, 0);
                 }
                 self.get_offset_o(r)
-            },
+            }
             _ => self.get_offset_gen(r, offset),
         }
     }

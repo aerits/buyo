@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use crate::{blockstacker::BlockStacker, randomizer::Randomizer};
 
-use super::{Tet};
+use super::Tet;
 use crate::tet::enums::Shapes;
 
 #[test]
@@ -13,5 +11,12 @@ fn test_rotate_o() {
     game.spawn_c_mino(Shapes::O);
     game.rotate_c_mino(1);
     assert_eq!(init_pos, game.controlled_mino.unwrap().vec);
+}
 
+#[test]
+fn test_grid() {
+    let mut game = Tet::new(10, 24, Randomizer::new(7, 727));
+    game.spawn_c_mino(Shapes::O);
+    // let a = game.print_board();
+    // assert_eq!(&a, "bruh");
 }
