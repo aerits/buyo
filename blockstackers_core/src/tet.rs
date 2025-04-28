@@ -11,6 +11,7 @@ mod tests;
 mod enums;
 mod tables;
 
+#[derive(Clone)]
 struct C_Mino {
     vec: Vec<BVec>,
     color: Mino,
@@ -164,14 +165,55 @@ impl Tet {
         mino.vec = new_pos;
         return true;
     }
+    fn print_board(&self) -> String {
+        let max_y = self.get_board().iter().fold(
+            0,
+            |total, cur| if cur.0.y > total { cur.0.y } else { total },
+        );
+        let max_x = self.get_board().iter().fold(
+            0,
+            |total, cur| if cur.0.x > total { cur.0.x } else { total },
+        );
+        let mut grid: Vec<Vec<String>> = Vec::with_capacity(max_y as usize);
+        for _i in 0..=max_y {
+            grid.push(Vec::with_capacity(max_x as usize));
+            for _j in 0..=max_x {
+                grid.last_mut().unwrap().push(" ".to_owned());
+            }
+        }
+        for (v, b) in self.get_board().iter() {
+            let s = match b {
+                Mino::Red => "R",
+                Mino::Blue => "B",
+                Mino::Yellow => "Y",
+                Mino::Orange => "O",
+                Mino::Wall => "W",
+                Mino::LightBlue => "L",
+                Mino::Green => "G",
+                Mino::Purple => "P",
+            }
+            .to_owned();
+            grid[v.y as usize][v.x as usize] = s;
+        }
+        let mut out = String::new();
+        for row in grid.iter() {
+            for col in row {
+                print!("{}", col);
+                out = out + col;
+            }
+            out = out + "\n";
+            println!();
+        }
+        out
+    }
 }
 
 impl BlockStacker<Mino> for Tet {
     fn new(width: i32, height: i32, randomizer: crate::randomizer::Randomizer) -> Self {
         let mut minos: HashMap<BVec, Mino> = HashMap::new();
-        for i in 0..width + 2 {
-            for j in 0..height + 2 {
-                if i % width + 2 == 0 || j == height + 2 {
+        for i in 0..=width + 1 {
+            for j in 0..=height + 1 {
+                if i % (width + 1) == 0 || j == height + 1 {
                     minos.insert(BVec { x: i, y: j }, Mino::Wall);
                 };
             }
@@ -186,30 +228,15 @@ impl BlockStacker<Mino> for Tet {
     }
 
     fn get_board(&self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
-        let max_x = self.minos.iter().fold(
-            0,
-            |total, cur| if cur.0.x > total { cur.0.x } else { total },
-        );
-        let max_y = self.minos.iter().fold(
-            0,
-            |total, cur| if cur.0.y > total { cur.0.y } else { total },
-        );
-        let mut grid: Vec<Vec<String>> = Vec::new();
-        for i in 0..max_y {
-            grid.push(Vec::new());
+        let vecs = match self.controlled_mino.clone() {
+            Some(x) => x.vec,
+            None => Vec::new(),
+        };
+        let mut a = self.minos.clone();
+        for i in vecs {
+            a.insert(i, self.controlled_mino.as_ref().unwrap().color);
         }
-        for (v, b) in self.minos.iter() {
-            let s = match b {
-                Mino::Red => "R",
-                Mino::Blue => "B",
-                Mino::Yellow => "Y",
-                Mino::Orange => todo!(),
-                Mino::Wall => todo!(),
-            }
-            .to_owned();
-            grid[v.y as usize][v.x as usize] = s;
-        }
-        todo!()
+        return a;
     }
 
     fn next_queue(&mut self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
@@ -225,35 +252,46 @@ impl BlockStacker<Mino> for Tet {
     }
 
     fn input_left(&mut self) {
-        todo!()
+        self.move_c_mino_if_no_collision(BVec { x: -1, y: 0 });
     }
 
     fn input_right(&mut self) {
-        todo!()
+        self.move_c_mino_if_no_collision(BVec { x: 1, y: 0 });
     }
 
     fn input_rotation_right(&mut self) {
-        todo!()
+        self.rotate_c_mino(1);
     }
 
     fn input_rotation_left(&mut self) {
-        todo!()
+        self.rotate_c_mino(3);
     }
 
     fn input_180_rot(&mut self) {
-        todo!()
+        self.rotate_c_mino(2);
     }
 
     fn hard_drop(&mut self) {
-        todo!()
+        while self.move_c_buyo_down() {}
     }
 
     fn move_c_buyo_down(&mut self) -> bool {
-        todo!()
+        self.move_c_mino_if_no_collision(BVec { x: 0, y: 1 })
     }
 
     fn is_on_ground(&self) -> bool {
-        todo!()
+        let vectors = match &self.controlled_mino {
+            Some(x) => &x.vec,
+            None => return false,
+        };
+        let mut output = true;
+        for v in vectors {
+            let u = v + &BVec::new(0, 1);
+            if self.minos.contains_key(&u) {
+                output = true;
+            }
+        }
+        return output;
     }
 
     fn score(&self) -> i32 {
