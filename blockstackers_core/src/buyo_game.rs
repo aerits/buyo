@@ -109,7 +109,7 @@ impl BlockStacker<BType> for BuyoBuyo {
         let a = self.buyos.clone();
         return a;
     }
-    fn next_queue(&mut self) -> HashMap<BVec, BType> {
+    fn next_queue(&self) -> HashMap<BVec, BType> {
         let a = self.next_buyo();
         let mut map = HashMap::new();
         map.insert(BVec::new(0, 0), a.0.clone());
@@ -318,7 +318,7 @@ impl BuyoBuyo {
         }
         true
     }
-    pub fn next_buyo(&mut self) -> (BType, BType) {
+    pub fn next_buyo(&self) -> (BType, BType) {
         let crnt_ptr = self.randomizer.current_pointer();
         let type_a = to_btype(self.randomizer.get(crnt_ptr + 1));
         let type_b = to_btype(self.randomizer.get(crnt_ptr + 2));

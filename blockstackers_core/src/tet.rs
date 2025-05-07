@@ -239,7 +239,7 @@ impl BlockStacker<Mino> for Tet {
         return a;
     }
 
-    fn next_queue(&mut self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
+    fn next_queue(&self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
         todo!()
     }
 
