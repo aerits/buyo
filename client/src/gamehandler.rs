@@ -39,7 +39,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             last_fall_time: get_current_time(),
             gravity: 1,
             block_offset: 0.0, // this lets the buyos move down smoothly instead of moving a whole block down
-            block_offset_dy: 0.5,
+            block_offset_dy: 1.0,
             fps: 0,
         }
     }

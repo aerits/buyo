@@ -16,7 +16,7 @@ impl Assets {
         }
     }
     pub async fn load(&mut self) {
-        let resp = self.load_var("/assets/fonts/arial.ttf").await;
+        let resp = self.load_var("/static/assets/fonts/arial.ttf").await;
         match resp {
             Some(x) => {
                 self.font = match Font::new(&x) {
@@ -34,7 +34,7 @@ impl Assets {
     }
     async fn load_var(&self, url: &str) -> Option<Vec<u8>> {
         // Create a new RequestInit object
-        let mut opts = RequestInit::new();
+        let opts = RequestInit::new();
         opts.set_method("GET");
 
         // Create a new Request object

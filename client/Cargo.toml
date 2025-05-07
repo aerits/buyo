@@ -16,3 +16,4 @@ wasm-bindgen-futures = "0.4.50"
 web-sys = {version = "0.3.77", features = ["Window", "Document", 'Headers', 'Request', 'RequestInit', 'RequestMode', 'Response']}
 # reqwest-websocket = "0.4.4"
 blockstackers_core = {path = "../blockstackers_core"}
+async-std = "1.13.1"
