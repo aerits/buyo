@@ -3,3 +3,4 @@
 /server/__pycache__
 /server/.venv
 /rserver/static
+/client_app_output/static
