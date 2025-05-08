@@ -4,7 +4,9 @@ welcome guys to my github repo. this is ppte (not an acronym for anyting) and it
 https://erm.0000727.xyz is where the game is hosted
 
 - build by using `build.sh`
-- run the server in ./server with `flask run`
+- also cargo build `wserver`
+- run the server in `/client_app_output/wserver`
+- use some sort of webserver in `/client_app_output/` like `python -m http.server`
 - this depends on having cargo, and `wasm-bindgen-cli` and `python` and `flask`
 - the build system for wasm is really scuffed
 
