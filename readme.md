@@ -1,7 +1,7 @@
 # ppte
 welcome guys to my github repo. this is ppte (not an acronym for anyting) and it will be a clone of the highly regarded puzzle mashup game.
 
-https://0000727.xyz is where the game is hosted
+https://erm.0000727.xyz is where the game is hosted
 
 - build by using `build.sh`
 - run the server in ./server with `flask run`
