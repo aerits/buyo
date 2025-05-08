@@ -24,7 +24,7 @@ fn main() {
     wasm_logger::init(wasm_logger::Config::default());
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    log::info!("version 89");
+    log::info!("version 90");
     wasm_bindgen_futures::spawn_local(async move {
         let mut state = Arc::new(Mutex::new(GameState::LoadingAssets));
         let mut window = MyWindowHandler::new(state.clone());
