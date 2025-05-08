@@ -4,3 +4,5 @@
 /server/.venv
 /rserver/static
 /client_app_output/static
+.idea
+/client_app_output/wserver
