@@ -257,12 +257,12 @@ impl BlockStacker<Mino> for Tet {
         }
     }
 
-    fn input_left(&mut self) {
-        self.move_c_mino_if_no_collision(BVec { x: -1, y: 0 });
+    fn input_left(&mut self) -> bool {
+        self.move_c_mino_if_no_collision(BVec { x: -1, y: 0 })
     }
 
-    fn input_right(&mut self) {
-        self.move_c_mino_if_no_collision(BVec { x: 1, y: 0 });
+    fn input_right(&mut self) -> bool {
+        self.move_c_mino_if_no_collision(BVec { x: 1, y: 0 })
     }
 
     fn input_rotation_right(&mut self) {

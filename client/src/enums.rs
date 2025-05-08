@@ -20,7 +20,7 @@ impl GameState {
     ) {
         match self {
             GameState::Gaming(game_handler) => {
-                game_handler.handle_inputs(&current_time, pressed_down_keys, auto_repeating_keys)
+                game_handler.handle_inputs(&current_time, pressed_down_keys, auto_repeating_keys);
             }
             GameState::Menu => (),
             GameState::LoadingAssets => (),

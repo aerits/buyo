@@ -21,6 +21,7 @@ pub struct GameHandler<T: BlockStacker<F>, F: Display> {
     block_offset_dy: f32,
     fps: i32,
     pub other_players: HashMap<String, HashMap<BVec, F>>,
+    pub key_pressed: bool,
 }
 impl<T: BlockStacker<F>, F: Display> GameHandler<T, F> {
     pub fn new(width: i32, height: i32) -> GameHandler<T, F> {
@@ -43,6 +44,7 @@ impl<T: BlockStacker<F>, F: Display> GameHandler<T, F> {
             block_offset_dy: 1.0,
             fps: 0,
             other_players: HashMap::new(),
+            key_pressed: false,
         }
     }
     pub fn handle_inputs(
@@ -50,14 +52,15 @@ impl<T: BlockStacker<F>, F: Display> GameHandler<T, F> {
         current_time: &u64,
         pressed_down_keys: &mut HashMap<VirtualKeyCode, u64>,
         auto_repeating_keys: &mut HashMap<VirtualKeyCode, u64>,
-    ) {
+    ) -> bool {
+        let mut output = false;
         for (key, time) in &auto_repeating_keys.clone() {
             if *current_time - *time > self.das && (*current_time - *time) % self.arr < 1 {
-                match key {
+                output = match key {
                     VirtualKeyCode::Left => self.game.input_left(),
                     VirtualKeyCode::Right => self.game.input_right(),
-                    _ => (),
-                }
+                    _ => false,
+                };
             }
         }
         for (key, time) in &pressed_down_keys.clone() {
@@ -66,12 +69,14 @@ impl<T: BlockStacker<F>, F: Display> GameHandler<T, F> {
                 VirtualKeyCode::Left => {
                     if !auto_repeating_keys.contains_key(&key) {
                         self.game.input_left();
+                        output = true;
                         auto_repeating_keys.insert(*key, *time);
                     }
                 }
                 VirtualKeyCode::Right => {
                     if !auto_repeating_keys.contains_key(&key) {
                         self.game.input_right();
+                        output = true;
                         auto_repeating_keys.insert(*key, *time);
                     }
                 }
@@ -98,6 +103,8 @@ impl<T: BlockStacker<F>, F: Display> GameHandler<T, F> {
                 _ => (),
             }
         }
+        if output {self.key_pressed = output};
+        return output;
     }
 
     pub fn update(&mut self, current_time: u64) -> i32 {

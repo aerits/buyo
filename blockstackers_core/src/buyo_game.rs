@@ -138,6 +138,15 @@ impl BlockStacker<BType> for BuyoBuyo {
         map.insert(BVec::new(0, 1), a.1.clone());
         return map;
     }
+    fn convert_t_to_speedy2d_color(&self, t: &BType) -> speedy2d::color::Color {
+        match t {
+            BType::Red => Color::RED,
+            BType::Blue => Color::BLUE,
+            BType::Green => Color::GREEN,
+            BType::Purple => Color::MAGENTA,
+            BType::Wall => Color::BLACK,
+        }
+    }
     fn get_controlled_block(&self) -> HashMap<BVec, BType> {
         let mut a = HashMap::new();
         match self.controlled_buyo {
@@ -149,20 +158,11 @@ impl BlockStacker<BType> for BuyoBuyo {
         }
         return a;
     }
-    fn convert_t_to_speedy2d_color(&self, t: &BType) -> speedy2d::color::Color {
-        match t {
-            BType::Red => Color::RED,
-            BType::Blue => Color::BLUE,
-            BType::Green => Color::GREEN,
-            BType::Purple => Color::MAGENTA,
-            BType::Wall => Color::BLACK,
-        }
+    fn input_left(&mut self) -> bool {
+        self.move_c_buyo_if_no_collision(BVec { x: -1, y: 0 })
     }
-    fn input_left(&mut self) {
-        self.move_c_buyo_if_no_collision(BVec { x: -1, y: 0 });
-    }
-    fn input_right(&mut self) {
-        self.move_c_buyo_if_no_collision(BVec { x: 1, y: 0 });
+    fn input_right(&mut self) -> bool {
+        self.move_c_buyo_if_no_collision(BVec { x: 1, y: 0 })
     }
     fn input_rotation_right(&mut self) {
         self.rotate_c_buyo(1);
@@ -371,8 +371,8 @@ impl BuyoBuyo {
         }
         moved
     }
-    // pop the buyos that are 4 or more of the same color connecting
-    // wall color does not pop
+    // pop the buyos that are 4 or more of the same Color connecting
+    // wall Color does not pop
     fn pop_buyos(&mut self) -> (bool, i32) {
         let a = self.gravity();
         if a {

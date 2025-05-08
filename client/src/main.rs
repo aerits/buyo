@@ -65,7 +65,7 @@ async fn network_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameS
                 Some(mut x) => {
                     futures::select! {
                         a = x.next().fuse() => {a}
-                        b = sleep(Duration::from_millis(5)).fuse() => {None}
+                        _ = sleep(Duration::from_millis(5)).fuse() => {None}
                     }
                 }
             };
@@ -97,11 +97,14 @@ async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameStat
         match *state.lock().await {
             GameState::Gaming(ref mut game_handler) => {
                 changed = game_handler.update(get_current_time());
+                key_pressed = game_handler.key_pressed;
+                if key_pressed {game_handler.key_pressed = false;}
             }
             GameState::Menu => (),
             GameState::LoadingAssets => (),
         }
-        if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 {
+        if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 || key_pressed {
+            key_pressed = false;
             match net.try_lock() {
                 None => {
                     log::info!("couldn't send");
@@ -116,7 +119,7 @@ async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameStat
                 }
             }
         }
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(50)).await;
     }
 }
 
