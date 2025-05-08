@@ -1,21 +1,17 @@
-use futures::FutureExt;
 use assets::Assets;
 use async_std::task::sleep;
+use blockstackers_core::blockstacker::BlockStacker;
+use blockstackers_core::buyo_game::{BType, BuyoBuyo};
 use enums::GameState;
 use futures::lock::{Mutex, MutexGuard};
+use futures::FutureExt;
 use gamehandler::GameHandler;
 use jstime::get_current_time;
 use network::NetworkConnection;
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::Duration,
-};
 use std::fmt::Display;
-use blockstackers_core::blockstacker::BlockStacker;
-use blockstackers_core::buyo_game::{BType, BuyoBuyo};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 fn main() {
     // let window = Window::new_centered("Title", (640, 480)).unwrap();
@@ -42,67 +38,16 @@ fn main() {
             }
         }
         *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
-        let game_loop = async {
-            let net = net.clone();
-            let state = state.clone();
-            let mut failed_to_send = false;
-            let mut last_send = 0;
-            loop {
-                log::info!("updating");
-                let mut changed = 0;
-                match *state.lock().await {
-                    GameState::Gaming(ref mut game_handler) => {
-                        changed = game_handler.update(get_current_time());
-                    }
-                    GameState::Menu => (),
-                    GameState::LoadingAssets => (),
-                }
-                if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 {
-                    match net.try_lock() {
-                        None => {log::info!("couldn't send"); failed_to_send = true},
-                        Some(mut x) => {
-                            last_send = get_current_time();
-                            failed_to_send = false;
-                            let game = &*state.lock().await;
-                            x.send(&network::serialize_game::<BuyoBuyo, BType>(game)).await;}
-                    }
-                }
-                sleep(Duration::from_millis(100)).await;
-            }
-        };
-        let network_loop = async {
-            let net = net.clone();
-            let state = state.clone();
-            loop {
-                loop {
-                    let a = match net.try_lock() {
-                        None => {None}
-                        Some(mut x) => {
-                            futures::select! {
-                            a = x.next().fuse() => {a}
-                            b = sleep(Duration::from_millis(5)).fuse() => {None}
-                        }
-                        }
-                    };
-                    match a {
-                        None => {break;}
-                        Some(x) => {
-                            let addr = x.split(":: ").next().unwrap().to_string();
-                            log::info!("addr: {}", addr);
-                            let game = network::deserialize_game(&x);
-                            state.lock().await.add_player(addr, game);
-                        }
-                    };
-                }
-                
-                // log::info!("{}", a.unwrap_or("nothing".to_owned()));
-                sleep(Duration::from_millis(100)).await;
-            }
-        };
+
+        // let network_loop =
         let draw_loop = async {
             WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
         };
-        futures::join!(game_loop, draw_loop, network_loop);
+        futures::join!(
+            game_loop(net.clone(), state.clone()),
+            draw_loop,
+            network_loop(net.clone(), state.clone())
+        );
     });
 }
 
@@ -111,6 +56,69 @@ mod enums;
 mod gamehandler;
 mod jstime;
 mod network;
+
+async fn network_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameState>>) {
+    loop {
+        loop {
+            let a = match net.try_lock() {
+                None => None,
+                Some(mut x) => {
+                    futures::select! {
+                        a = x.next().fuse() => {a}
+                        b = sleep(Duration::from_millis(5)).fuse() => {None}
+                    }
+                }
+            };
+            match a {
+                None => {
+                    break;
+                }
+                Some(x) => {
+                    let addr = x.split(":: ").next().unwrap().to_string();
+                    log::info!("addr: {}", addr);
+                    let game = network::deserialize_game(&x);
+                    state.lock().await.add_player(addr, game);
+                }
+            };
+        }
+
+        // log::info!("{}", a.unwrap_or("nothing".to_owned()));
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameState>>) {
+    let mut failed_to_send = false;
+    let mut last_send = 0;
+    let mut key_pressed = false;
+    loop {
+        log::info!("updating");
+        let mut changed = 0;
+        match *state.lock().await {
+            GameState::Gaming(ref mut game_handler) => {
+                changed = game_handler.update(get_current_time());
+            }
+            GameState::Menu => (),
+            GameState::LoadingAssets => (),
+        }
+        if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 {
+            match net.try_lock() {
+                None => {
+                    log::info!("couldn't send");
+                    failed_to_send = true
+                }
+                Some(mut x) => {
+                    last_send = get_current_time();
+                    failed_to_send = false;
+                    let game = &*state.lock().await;
+                    x.send(&network::serialize_game::<BuyoBuyo, BType>(game))
+                        .await;
+                }
+            }
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
+}
 
 struct MyWindowHandler {
     state: Arc<Mutex<GameState>>,

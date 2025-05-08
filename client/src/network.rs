@@ -49,6 +49,10 @@ pub fn serialize_game<T: BlockStacker<F>, F: Display>(game: &GameState) -> Strin
                 let a = "(".to_owned() +  &v.to_string() +  "," + &c.to_string() + ")";
                 s.push_str( &a );
             }
+            for (v, c) in game.game.get_controlled_block() {
+                let a = "(".to_owned() +  &v.to_string() +  "," + &c.to_string() + ")";
+                s.push_str( &a );
+            }
         }
         GameState::Menu => {
             s.push_str("Menu: ");
