@@ -1,22 +1,3 @@
-//! A chat server that broadcasts a message to all connections.
-//!
-//! This is a simple line-based server which accepts WebSocket connections,
-//! reads lines from those connections, and broadcasts the lines to all other
-//! connected clients.
-//!
-//! You can test this out by running:
-//!
-//!     cargo run --example server 127.0.0.1:12345
-//!
-//! And then in another window run:
-//!
-//!     cargo run --example client ws://127.0.0.1:12345/
-//!
-//! You can run the second command in multiple windows and then chat between the
-//! two, seeing the messages from the other client as they're received. For all
-//! connected clients they'll all join the same room and see everyone else's
-//! messages.
-
 use std::{
     collections::HashMap,
     env,
@@ -30,6 +11,7 @@ use futures_util::{future, pin_mut, stream::TryStreamExt, StreamExt};
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::tungstenite::Utf8Bytes;
 
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<Mutex<State>>;
@@ -87,12 +69,14 @@ async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: Socke
             .clients
             .iter()
             .filter(|(peer_addr, _)| {
-                (peer_addr != &&addr) && (peers.client_room.get(&peer_addr) == peers.client_room.get(&&addr))
+                // (peer_addr != &&addr) &&
+                    (peers.client_room.get(&peer_addr) == peers.client_room.get(&&addr))
             })
             .map(|(_, ws_sink)| ws_sink);
-
+        let my_string = addr.to_string() + ":: " + &*msg.into_text().unwrap();
+        let new_message = Message::Text(Utf8Bytes::try_from(my_string.into_bytes()).unwrap());
         for recp in broadcast_recipients {
-            recp.unbounded_send(msg.clone()).unwrap();
+            recp.unbounded_send(new_message.clone()).unwrap();
         }
 
         future::ok(())
@@ -111,7 +95,7 @@ async fn handle_connection(peer_map: PeerMap, raw_stream: TcpStream, addr: Socke
 async fn main() -> Result<(), IoError> {
     let addr = env::args()
         .nth(1)
-        .unwrap_or_else(|| "127.0.0.1:8080".to_string());
+        .unwrap_or_else(|| "0.0.0.0:7272".to_string());
 
     let state = PeerMap::new(Mutex::new(State::new()));
 

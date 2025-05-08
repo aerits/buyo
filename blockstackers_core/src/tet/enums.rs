@@ -1,4 +1,6 @@
-#[derive(Clone, Copy)]
+use std::fmt::Display;
+
+#[derive(Clone, Copy, Debug)]
 pub enum Mino {
     Red,
     Blue,
@@ -8,6 +10,12 @@ pub enum Mino {
     Green,
     Purple,
     Wall,
+}
+
+impl Display for Mino {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
 }
 #[derive(Clone, Copy)]
 pub enum Shapes {

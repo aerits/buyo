@@ -13,7 +13,27 @@ console_error_panic_hook = "0.1.6"
 # reqwest-wasm = "0.11.16"
 futures = "0.3.31"
 wasm-bindgen-futures = "0.4.50"
-web-sys = {version = "0.3.77", features = ["Window", "Document", 'Headers', 'Request', 'RequestInit', 'RequestMode', 'Response']}
 # reqwest-websocket = "0.4.4"
 blockstackers_core = {path = "../blockstackers_core"}
 async-std = "1.13.1"
+ws_stream_wasm = "0.7.4"
+pharos = "0.5.3"
+regex = "1.11.1"
+
+[dependencies.web-sys]
+version = "0.3.77"
+features = [
+    "Window",
+    "Document",
+    'Headers',
+    'Request',
+    'RequestInit',
+    'RequestMode',
+    'Response',
+    "BinaryType",
+    "Blob",
+    "ErrorEvent",
+    "FileReader",
+    "MessageEvent",
+    "ProgressEvent",
+    "WebSocket",]

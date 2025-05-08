@@ -243,12 +243,18 @@ impl BlockStacker<Mino> for Tet {
         todo!()
     }
 
-    fn convert_t_to_speedy2d_color(&self, t: Mino) -> speedy2d::color::Color {
+    fn convert_t_to_speedy2d_color(&self, t: &Mino) -> speedy2d::color::Color {
         todo!()
     }
 
     fn get_controlled_block(&self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
-        todo!()
+        match &self.controlled_mino {
+            None => {HashMap::new()}
+            Some(c) => {c.vec.iter().fold(HashMap::new(), |mut acc, x| {
+                acc.insert(*x, c.color);
+                acc
+            })}
+        }
     }
 
     fn input_left(&mut self) {

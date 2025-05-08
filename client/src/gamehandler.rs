@@ -1,13 +1,13 @@
 use std::{collections::HashMap, marker::PhantomData};
-
+use std::fmt::Display;
 use blockstackers_core::{blockstacker::BlockStacker, randomizer::Randomizer};
 use speedy2d::{color::Color, font::{TextLayout, TextOptions}, window::VirtualKeyCode, Graphics2D};
-
+use blockstackers_core::vectors::BVec;
 use crate::jstime::get_current_time;
 use crate::assets::Assets;
 
-pub struct GameHandler<T: BlockStacker<F>, F> {
-    game: T,
+pub struct GameHandler<T: BlockStacker<F>, F: Display> {
+    pub game: T,
     phantom: std::marker::PhantomData<F>,
     last_update_time: u64,
     is_time_to_freeze: bool,               // set by game,
@@ -20,8 +20,9 @@ pub struct GameHandler<T: BlockStacker<F>, F> {
     block_offset: f32,
     block_offset_dy: f32,
     fps: i32,
+    pub other_players: HashMap<String, HashMap<BVec, F>>,
 }
-impl<T: BlockStacker<F>, F> GameHandler<T, F> {
+impl<T: BlockStacker<F>, F: Display> GameHandler<T, F> {
     pub fn new(width: i32, height: i32) -> GameHandler<T, F> {
         GameHandler {
             game: T::new(
@@ -41,6 +42,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             block_offset: 0.0, // this lets the buyos move down smoothly instead of moving a whole block down
             block_offset_dy: 1.0,
             fps: 0,
+            other_players: HashMap::new(),
         }
     }
     pub fn handle_inputs(
@@ -97,10 +99,12 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             }
         }
     }
-    pub fn update(&mut self, current_time: u64) {
+
+    pub fn update(&mut self, current_time: u64) -> i32 {
+        let mut output = 0;
         if current_time - self.last_update_time > 300 {
             // game_handler.game.print_grid();
-            self.game.game_loop(self.is_time_to_freeze);
+            output = self.game.game_loop(self.is_time_to_freeze);
             self.last_update_time = current_time;
         }
         if current_time - self.last_fall_time > self.gravity {
@@ -112,9 +116,10 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
                 self.block_offset -= 20.0;
             }
             // println!("{}", self.fps);
-            // self.fps = 0;
+            // log::info!("{}", self.fps);
+            self.fps = 0;
         }
-        // self.fps += 1;
+        self.fps += 1;
 
         if self.game.is_on_ground() {
             self.block_offset = 0.0;
@@ -134,7 +139,9 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             self.is_time_to_freeze = false;
             self.timestamp_when_on_ground = None;
         }
+        return output;
     }
+
     pub fn draw(
         &self,
         graphics: &mut Graphics2D,
@@ -146,8 +153,19 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             graphics.draw_circle(
                 (v.x as f32 * 20.0 + 20.0, v.y as f32 * 20.0 + 20.0),
                 10.0,
-                self.game.convert_t_to_speedy2d_color(c),
+                self.game.convert_t_to_speedy2d_color(&c),
             );
+        }
+        for (i, (_ip, player)) in self.other_players.iter().enumerate() {
+            for (v, c) in player {
+                let mut v = *v;
+                v.add_i(10*(i+1) as i32, 0);
+                graphics.draw_circle(
+                    (v.x as f32 * 20.0 + 20.0, v.y as f32 * 20.0 + 20.0),
+                    10.0,
+                    self.game.convert_t_to_speedy2d_color(c),
+                )
+            }
         }
         for (v, c) in self.game.get_controlled_block() {
             graphics.draw_circle(
@@ -156,7 +174,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
                     v.y as f32 * 20.0 + 20.0 + self.block_offset,
                 ),
                 10.0,
-                self.game.convert_t_to_speedy2d_color(c),
+                self.game.convert_t_to_speedy2d_color(&c),
             );
         }
         // next queue
@@ -165,7 +183,7 @@ impl<T: BlockStacker<F>, F> GameHandler<T, F> {
             graphics.draw_circle(
                 (200.0, 90.0 + (v.y * 20) as f32),
                 10.0,
-                self.game.convert_t_to_speedy2d_color(c),
+                self.game.convert_t_to_speedy2d_color(&c),
             );
         }
 
