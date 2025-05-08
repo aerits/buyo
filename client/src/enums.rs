@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-
+use std::fmt::Display;
 use blockstackers_core::buyo_game::{BType, BuyoBuyo};
 use speedy2d::window::VirtualKeyCode;
-
+use blockstackers_core::blockstacker::BlockStacker;
+use blockstackers_core::vectors::BVec;
 use crate::gamehandler::GameHandler;
 
 pub enum GameState {
@@ -23,6 +24,15 @@ impl GameState {
             }
             GameState::Menu => (),
             GameState::LoadingAssets => (),
+        }
+    }
+    pub fn add_player(&mut self, addr: String, player: HashMap<BVec, BType>) {
+        match self  {
+            GameState::Gaming(game_handler) => {
+                game_handler.other_players.insert(addr, player);
+            }
+            GameState::LoadingAssets => {},
+            GameState::Menu => (),
         }
     }
 }

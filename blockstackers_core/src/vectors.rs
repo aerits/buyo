@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -39,5 +40,10 @@ impl Sub for &BVec {
 
     fn sub(self, rhs: Self) -> Self::Output {
         BVec::new(self.x - rhs.x, self.y - rhs.y)
+    }
+}
+impl Display for BVec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return write!(f, "[{}, {}]", self.x, self.y);
     }
 }

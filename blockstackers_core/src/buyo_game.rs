@@ -1,21 +1,43 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-
+use std::fmt::Display;
 use speedy2d::color::Color;
 
-use crate::blockstacker::BlockStacker;
+use crate::blockstacker::{color, BlockStacker};
 use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
 
 #[cfg(test)]
 mod tests;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum BType {
     Red,
     Blue,
     Green,
     Purple,
     Wall,
+}
+
+impl color for BType {
+    fn from_str(color: &str) -> Option<Self>
+    where
+        Self: Sized
+    {
+        match color.to_lowercase().as_str() {
+            "red" => Some(BType::Red),
+            "blue" => Some(BType::Blue),
+            "green" => Some(BType::Green),
+            "purple" => Some(BType::Purple),
+            "wall" => Some(BType::Wall),
+            _ => {None}
+        }
+    }
+}
+
+impl Display for BType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
 }
 
 fn to_btype(i: i32) -> BType {
@@ -127,7 +149,7 @@ impl BlockStacker<BType> for BuyoBuyo {
         }
         return a;
     }
-    fn convert_t_to_speedy2d_color(&self, t: BType) -> speedy2d::color::Color {
+    fn convert_t_to_speedy2d_color(&self, t: &BType) -> speedy2d::color::Color {
         match t {
             BType::Red => Color::RED,
             BType::Blue => Color::BLUE,

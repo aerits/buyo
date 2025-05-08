@@ -1,12 +1,19 @@
 use std::collections::HashMap;
+use std::fmt::Display;
 use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
 
-pub trait BlockStacker<T> {
+pub trait color {
+    fn from_str(color: &str) -> Option<Self>
+    where
+        Self: Sized;
+}
+
+pub trait BlockStacker<T: Display> {
     fn new(width: i32, height: i32, randomizer: Randomizer) -> Self;
     fn get_board(&self) -> HashMap<BVec, T>;
     fn next_queue(&self) -> HashMap<BVec, T>;
-    fn convert_t_to_speedy2d_color(&self, t: T) -> speedy2d::color::Color;
+    fn convert_t_to_speedy2d_color(&self, t: &T) -> speedy2d::color::Color;
     fn get_controlled_block(&self) -> HashMap<BVec, T>;
     fn input_left(&mut self);
     fn input_right(&mut self);
