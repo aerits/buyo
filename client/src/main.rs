@@ -12,6 +12,9 @@ use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
 use std::fmt::Display;
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use speedy2d::color::Color;
+use speedy2d::font::{TextLayout, TextOptions};
+use crate::main_menu::Menu;
 
 fn main() {
     // let window = Window::new_centered("Title", (640, 480)).unwrap();
@@ -24,30 +27,10 @@ fn main() {
     wasm_logger::init(wasm_logger::Config::default());
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    log::info!("version 90");
-    wasm_bindgen_futures::spawn_local(async move {
-        let mut state = Arc::new(Mutex::new(GameState::LoadingAssets));
-        let mut window = MyWindowHandler::new(state.clone());
-        let mut last_check = 0;
-        let url = window.assets.site_url.clone();
-        let mut net = Arc::new(Mutex::new(NetworkConnection::new(&url).await));
-        while window.assets.font.is_none() {
-            if get_current_time() - last_check > 1000 {
-                window.assets.load().await;
-                last_check = get_current_time();
-            }
-        }
-        *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
+    log::info!("version 91");
 
-        // let network_loop =
-        let draw_loop = async {
-            WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
-        };
-        futures::join!(
-            game_loop(net.clone(), state.clone()),
-            draw_loop,
-            network_loop(net.clone(), state.clone())
-        );
+    wasm_bindgen_futures::spawn_local(async move {
+        start_game().await;
     });
 }
 
@@ -56,6 +39,48 @@ mod enums;
 mod gamehandler;
 mod jstime;
 mod network;
+mod main_menu;
+mod draw_scaled;
+
+async fn start_game() {
+    let mut state = Arc::new(Mutex::new(GameState::LoadingAssets));
+    let mut window = MyWindowHandler::new(state.clone());
+
+    {
+        let mut last_check = 0;
+        while window.assets.font.is_none() {
+            if get_current_time() - last_check > 1000 {
+                window.assets.load().await;
+                last_check = get_current_time();
+            }
+        }
+    }
+
+    let ws_url = window.assets.ws_url().await;
+    let net = NetworkConnection::new(&ws_url).await;
+    let net = match net {
+        Ok(net) => net,
+        Err(E) => {
+            *state.lock().await = GameState::Error(E.to_string());
+            WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
+            log::error!("Failed to connect to websocket server");
+            return;
+        }
+    };
+    let mut net = Arc::new(Mutex::new(net));
+
+    // *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
+    *state.lock().await = GameState::Menu(Menu::new());
+    // let network_loop =
+    let draw_loop = async {
+        WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
+    };
+    futures::join!(
+            game_loop(net.clone(), state.clone()),
+            draw_loop,
+            network_loop(net.clone(), state.clone())
+        );
+}
 
 async fn network_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameState>>) {
     loop {
@@ -100,8 +125,9 @@ async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameStat
                 key_pressed = game_handler.key_pressed;
                 if key_pressed {game_handler.key_pressed = false;}
             }
-            GameState::Menu => (),
+            GameState::Menu(ref menu) => (),
             GameState::LoadingAssets => (),
+            GameState::Error(_) => {panic!("Invalid game state")}
         }
         if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 || key_pressed {
             key_pressed = false;
@@ -142,6 +168,7 @@ impl MyWindowHandler {
 }
 
 impl WindowHandler for MyWindowHandler {
+
     fn on_draw(&mut self, helper: &mut WindowHelper, graphics: &mut Graphics2D) {
         match *(match self.state.try_lock() {
             Some(mut x) => {
@@ -158,13 +185,26 @@ impl WindowHandler for MyWindowHandler {
             }
         }) {
             GameState::Gaming(ref game_handler) => {
+                graphics.clear_screen(Color::WHITE);
                 game_handler.draw(graphics, &self.assets);
                 helper.request_redraw();
             }
-            GameState::Menu => todo!(),
+            GameState::Menu(ref menu) => {
+                menu.draw(graphics, &self.assets);
+            },
             GameState::LoadingAssets => {}
+            GameState::Error(ref E) => {
+                let error = &self.assets.font.as_ref().unwrap().layout_text(
+                    &format!("Error: {}", E),
+                    20.0,
+                    TextOptions::new(),
+                );
+                graphics.draw_text((0.0, 0.0), Color::BLACK, &error);
+                helper.request_redraw();
+            }
         }
     }
+
     fn on_key_down(
         &mut self,
         _helper: &mut WindowHelper<()>,
@@ -182,6 +222,7 @@ impl WindowHandler for MyWindowHandler {
             None => {}
         };
     }
+
     fn on_key_up(
         &mut self,
         _helper: &mut WindowHelper<()>,

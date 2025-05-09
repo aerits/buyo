@@ -1,15 +1,15 @@
-use std::collections::HashMap;
-use std::fmt::Display;
-use blockstackers_core::buyo_game::{BType, BuyoBuyo};
-use speedy2d::window::VirtualKeyCode;
-use blockstackers_core::blockstacker::BlockStacker;
-use blockstackers_core::vectors::BVec;
 use crate::gamehandler::GameHandler;
+use crate::main_menu::Menu;
+use blockstackers_core::buyo_game::{BType, BuyoBuyo};
+use blockstackers_core::vectors::BVec;
+use speedy2d::window::VirtualKeyCode;
+use std::collections::HashMap;
 
 pub enum GameState {
     Gaming(GameHandler<BuyoBuyo, BType>),
-    Menu,
+    Menu(Menu),
     LoadingAssets,
+    Error(String),
 }
 impl GameState {
     pub fn handle_inputs(
@@ -22,8 +22,7 @@ impl GameState {
             GameState::Gaming(game_handler) => {
                 game_handler.handle_inputs(&current_time, pressed_down_keys, auto_repeating_keys);
             }
-            GameState::Menu => (),
-            GameState::LoadingAssets => (),
+            _ => {}
         }
     }
     pub fn add_player(&mut self, addr: String, player: HashMap<BVec, BType>) {
@@ -31,8 +30,7 @@ impl GameState {
             GameState::Gaming(game_handler) => {
                 game_handler.other_players.insert(addr, player);
             }
-            GameState::LoadingAssets => {},
-            GameState::Menu => (),
+            _ => {}
         }
     }
 }

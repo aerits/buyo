@@ -1,3 +1,4 @@
+use std::str::Utf8Chunk;
 use speedy2d::font::Font;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen::JsCast, Request, RequestInit, Response};
@@ -30,6 +31,13 @@ impl Assets {
             None => {
                 log::info!("server didn't respond")
             }
+        }
+    }
+    pub async fn ws_url(&self) -> String {
+        let url = self.load_var("/static/assets/server_url.txt").await;
+        match url {
+            Some(x) => str::from_utf8(&x).unwrap().trim().to_string(),
+            None => panic!("server_url not found"),
         }
     }
     async fn load_var(&self, url: &str) -> Option<Vec<u8>> {
