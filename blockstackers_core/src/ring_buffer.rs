@@ -26,7 +26,8 @@ impl<T: Clone> RingBuffer<T> {
         if idx >= self.size {return None}
         let mut out = self.tail as isize - idx as isize;
         if out < 0 {
-            out =  (self.contents.len() - (idx % self.contents.len())) as isize + 1;
+            // out =  (self.contents.len() - (idx % self.contents.len())) as isize + 1;
+            out += self.contents.len() as isize;
         }
         Some(&self.contents[out as usize])
     }
@@ -49,7 +50,7 @@ impl<T: Clone> RingBufferVec<T> {
     pub fn get(&self, idx: usize) -> Option<&T> {
         if idx > self.size || (idx as isize) < self.size as isize -  self.ring_buffer.size as isize {return None}
         let mut idx = self.ring_buffer.tail as isize - idx as isize - 1;
-        if idx < 0 {
+        while idx < 0 {
             idx = self.ring_buffer.size as isize + idx;
         }
         
@@ -77,7 +78,7 @@ mod tests {
         assert_eq!(rb.get(0), Some(&11));
         assert_eq!(rb.get(1), Some(&10));
         assert_eq!(rb.get(2), Some(&9));
-        assert_eq!(rb.get(9), Some(&1));
+        assert_eq!(rb.get(9), Some(&2));
     }
     #[test]
     fn ring_buffer_vec_push() {
@@ -102,5 +103,12 @@ mod tests {
         assert_eq!(rb.get(10), Some(&11));
         assert_eq!(rb.get(11), Some(&12));
         assert_eq!(rb.get(0), None);
+    }
+    #[test]
+    fn ring_buffer_vec_push2() {
+        let mut rb = RingBufferVec::new(-69, 2);
+        rb.push(0);
+        rb.push(1);
+        rb.get(0);
     }
 }

@@ -1,4 +1,3 @@
-use std::str::Utf8Chunk;
 use speedy2d::font::Font;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen::JsCast, Request, RequestInit, Response};

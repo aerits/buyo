@@ -51,7 +51,7 @@ pub fn serialize_game<T: BlockStacker<F>, F: Display>(game: &GameState) -> Strin
                 s.push_str( &a );
             }
         }
-        GameState::Menu(menu) => {
+        GameState::Menu() => {
             s.push_str("Menu: ");
         }
         GameState::LoadingAssets => {

@@ -1,5 +1,4 @@
 use crate::gamehandler::GameHandler;
-use crate::main_menu::Menu;
 use blockstackers_core::buyo_game::{BType, BuyoBuyo};
 use blockstackers_core::vectors::BVec;
 use speedy2d::window::VirtualKeyCode;
@@ -7,7 +6,7 @@ use std::collections::HashMap;
 
 pub enum GameState {
     Gaming(GameHandler<BuyoBuyo, BType>),
-    Menu(Menu),
+    Menu(),
     LoadingAssets,
     Error(String),
 }

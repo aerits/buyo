@@ -3,18 +3,16 @@ use async_std::task::sleep;
 use blockstackers_core::blockstacker::BlockStacker;
 use blockstackers_core::buyo_game::{BType, BuyoBuyo};
 use enums::GameState;
-use futures::lock::{Mutex, MutexGuard};
+use futures::lock::Mutex;
 use futures::FutureExt;
-use gamehandler::GameHandler;
 use jstime::get_current_time;
 use network::NetworkConnection;
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
-use std::fmt::Display;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use speedy2d::color::Color;
 use speedy2d::font::{TextLayout, TextOptions};
-use crate::main_menu::Menu;
+use crate::gamehandler::GameHandler;
 
 fn main() {
     // let window = Window::new_centered("Title", (640, 480)).unwrap();
@@ -39,11 +37,10 @@ mod enums;
 mod gamehandler;
 mod jstime;
 mod network;
-mod main_menu;
 mod draw_scaled;
 
 async fn start_game() {
-    let mut state = Arc::new(Mutex::new(GameState::LoadingAssets));
+    let state = Arc::new(Mutex::new(GameState::LoadingAssets));
     let mut window = MyWindowHandler::new(state.clone());
 
     {
@@ -67,10 +64,9 @@ async fn start_game() {
             return;
         }
     };
-    let mut net = Arc::new(Mutex::new(net));
+    let net = Arc::new(Mutex::new(net));
 
-    // *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
-    *state.lock().await = GameState::Menu(Menu::new());
+    *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
     // let network_loop =
     let draw_loop = async {
         WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
@@ -125,7 +121,7 @@ async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameStat
                 key_pressed = game_handler.key_pressed;
                 if key_pressed {game_handler.key_pressed = false;}
             }
-            GameState::Menu(ref menu) => (),
+            GameState::Menu() => (),
             GameState::LoadingAssets => (),
             GameState::Error(_) => {panic!("Invalid game state")}
         }
@@ -189,8 +185,7 @@ impl WindowHandler for MyWindowHandler {
                 game_handler.draw(graphics, &self.assets);
                 helper.request_redraw();
             }
-            GameState::Menu(ref menu) => {
-                menu.draw(graphics, &self.assets);
+            GameState::Menu() => {
             },
             GameState::LoadingAssets => {}
             GameState::Error(ref E) => {
