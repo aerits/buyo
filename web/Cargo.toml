@@ -10,3 +10,5 @@ tower-http = { version = "0.6.4", features = ["trace", "fs"] }
 tracing-subscriber = "0.3.19"
 futures = "0.3.31"
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
+lazy_static = "1.5.0"
+tower-cookies = "0.11.0"
