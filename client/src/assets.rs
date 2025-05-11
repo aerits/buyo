@@ -1,3 +1,4 @@
+use std::str::from_utf8;
 use speedy2d::font::Font;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen::JsCast, Request, RequestInit, Response};
@@ -33,9 +34,9 @@ impl Assets {
         }
     }
     pub async fn ws_url(&self) -> String {
-        let url = self.load_var("/static/assets/server_url.txt").await;
+        let url = self.load_var(&(self.site_url.clone() + "/ws")).await;
         match url {
-            Some(x) => str::from_utf8(&x).unwrap().trim().to_string(),
+            Some(x) => from_utf8(&x).unwrap().trim().to_string(),
             None => panic!("server_url not found"),
         }
     }
