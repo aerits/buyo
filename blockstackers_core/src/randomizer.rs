@@ -13,7 +13,7 @@ pub struct Randomizer {
 impl Randomizer {
     pub fn new(max: i32, seed: u128) -> Randomizer {
         let rng = Rand64::new(seed);
-        Randomizer { queue: RefCell::new(RingBufferVec::new(0, 4)), max, current: 0, rng: RefCell::new(rng) }
+        Randomizer { queue: RefCell::new(RingBufferVec::new(0, 100)), max, current: 0, rng: RefCell::new(rng) }
     }
     pub fn get(&self, i: i32) -> i32 {
         while (self.queue.borrow().len() as i32) < i+1 {

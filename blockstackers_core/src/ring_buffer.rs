@@ -26,7 +26,6 @@ impl<T: Clone> RingBuffer<T> {
         if idx >= self.size {return None}
         let mut out = self.tail as isize - idx as isize;
         if out < 0 {
-            // out =  (self.contents.len() - (idx % self.contents.len())) as isize + 1;
             out += self.contents.len() as isize;
         }
         Some(&self.contents[out as usize])
