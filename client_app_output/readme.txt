@@ -1,3 +1,2 @@
-run a webserver in here to host the client
-- create a file in /assets called server_url.txt to indicate the websocket server url
-- it runs on port 7272 by default
+- run ./web from /buyo or else it doesn't work
+- the server is on 0.0.0.0:5000, expose that port somehow to host the server
