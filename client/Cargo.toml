@@ -8,12 +8,8 @@ speedy2d = {version = "2.1.0"}
 log = "0.4"
 wasm-logger = "0.2"
 console_error_panic_hook = "0.1.6"
-# wasm-bindgen = "0.2.100"
-# reqwest = {version = "0.12.15"}
-# reqwest-wasm = "0.11.16"
 futures = "0.3.31"
 wasm-bindgen-futures = "0.4.50"
-# reqwest-websocket = "0.4.4"
 blockstackers_core = {path = "../blockstackers_core"}
 async-std = "1.13.1"
 ws_stream_wasm = "0.7.4"
@@ -22,18 +18,4 @@ regex = "1.11.1"
 
 [dependencies.web-sys]
 version = "0.3.77"
-features = [
-    "Window",
-    "Document",
-    'Headers',
-    'Request',
-    'RequestInit',
-    'RequestMode',
-    'Response',
-    "BinaryType",
-    "Blob",
-    "ErrorEvent",
-    "FileReader",
-    "MessageEvent",
-    "ProgressEvent",
-    "WebSocket",]
+features = ["Window", "Document", "Headers", "Request", "RequestInit", "RequestMode", "Response", "BinaryType", "Blob", "ErrorEvent", "FileReader", "MessageEvent", "ProgressEvent", "WebSocket", "Element", "HtmlElement"]

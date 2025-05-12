@@ -15,8 +15,8 @@ pub trait BlockStacker<T: Display> {
     fn next_queue(&self) -> HashMap<BVec, T>;
     fn convert_t_to_speedy2d_color(&self, t: &T) -> speedy2d::color::Color;
     fn get_controlled_block(&self) -> HashMap<BVec, T>;
-    fn input_left(&mut self);
-    fn input_right(&mut self);
+    fn input_left(&mut self) -> bool;
+    fn input_right(&mut self) -> bool;
     fn input_rotation_right(&mut self);
     fn input_rotation_left(&mut self);
     fn input_180_rot(&mut self);

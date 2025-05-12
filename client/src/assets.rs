@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+use std::str::from_utf8;
+>>>>>>> quickplay
 use speedy2d::font::Font;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen::JsCast, Request, RequestInit, Response};
@@ -31,6 +35,9 @@ impl Assets {
                 log::info!("server didn't respond")
             }
         }
+    }
+    pub async fn ws_url(&self) -> String {
+        return "/ws".to_string()
     }
     async fn load_var(&self, url: &str) -> Option<Vec<u8>> {
         // Create a new RequestInit object

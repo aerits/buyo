@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 
 use oorandom::Rand64;
+use crate::ring_buffer::RingBufferVec;
 
 pub struct Randomizer {
-    queue: RefCell<Vec<i32>>,
+    queue: RefCell<RingBufferVec<i32>>,
     max: i32,
     current: i32,
     rng: RefCell<Rand64>
@@ -12,7 +13,7 @@ pub struct Randomizer {
 impl Randomizer {
     pub fn new(max: i32, seed: u128) -> Randomizer {
         let rng = Rand64::new(seed);
-        Randomizer { queue: RefCell::new(Vec::new()), max, current: 0, rng: RefCell::new(rng) }
+        Randomizer { queue: RefCell::new(RingBufferVec::new(0, 100)), max, current: 0, rng: RefCell::new(rng) }
     }
     pub fn get(&self, i: i32) -> i32 {
         while (self.queue.borrow().len() as i32) < i+1 {

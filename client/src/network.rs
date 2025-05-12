@@ -1,29 +1,26 @@
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::str::FromStr;
-use futures::{AsyncBufReadExt, SinkExt, StreamExt};
-use pharos::{Events, Observable, ObserveConfig};
-use regex::Regex;
-use speedy2d::color::Color;
-use web_sys::wasm_bindgen::UnwrapThrowExt;
-use ws_stream_wasm::{WsEvent, WsMessage, WsMeta, WsStream};
+use crate::enums::GameState;
 use blockstackers_core::blockstacker::{color, BlockStacker};
 use blockstackers_core::buyo_game::BType;
 use blockstackers_core::vectors::BVec;
-use crate::enums::GameState;
+use futures::{SinkExt, StreamExt};
+use pharos::{Events, Observable, ObserveConfig};
+use regex::Regex;
+use std::collections::HashMap;
+use std::error::Error;
+use std::fmt::Display;
+use std::str::FromStr;
+use ws_stream_wasm::{WsEvent, WsMessage, WsMeta, WsStream};
 
 pub struct NetworkConnection {
     ws: WsMeta,
     wsio: WsStream,
     evts: Events<WsEvent>,
 }
-
 impl NetworkConnection {
-    pub async fn new(base_url: &str) -> NetworkConnection {
-        let (mut ws, wsio) = WsMeta::connect( "https://ws.0000727.xyz", None ).await
-            .expect_throw( "assume the connection succeeds" );
+    pub async fn new(ws_url: &str) -> Result<NetworkConnection, Box<dyn Error>> {
+        let (mut ws, wsio) = WsMeta::connect( ws_url, None ).await?;
         let evts = ws.observe( ObserveConfig::default() ).await.unwrap();
-        NetworkConnection { ws, wsio, evts }
+        Ok(NetworkConnection { ws, wsio, evts })
     }
     pub async fn next(&mut self) -> Option<String> {
         match self.wsio.next().await {
@@ -49,12 +46,19 @@ pub fn serialize_game<T: BlockStacker<F>, F: Display>(game: &GameState) -> Strin
                 let a = "(".to_owned() +  &v.to_string() +  "," + &c.to_string() + ")";
                 s.push_str( &a );
             }
+            for (v, c) in game.game.get_controlled_block() {
+                let a = "(".to_owned() +  &v.to_string() +  "," + &c.to_string() + ")";
+                s.push_str( &a );
+            }
         }
-        GameState::Menu => {
+        GameState::Menu() => {
             s.push_str("Menu: ");
         }
         GameState::LoadingAssets => {
             s.push_str("LoadingAssets: ");
+        }
+        _ => {
+            panic!("Unsupported game state");
         }
     }
 

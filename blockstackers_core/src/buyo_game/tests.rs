@@ -38,3 +38,21 @@ fn test_score_2chain() {
     // a.bg.group_bonus.push(0);
     assert_eq!(320, a.bg.score())
 }
+
+#[test]
+fn test_randomizer() {
+    let mut a = TestInit::init();
+    a.bg.next_queue();
+    a.bg.game_loop(false); 
+    a.bg.hard_drop();
+    a.bg.next_queue();
+    a.bg.next_queue();
+    a.bg.game_loop(false); 
+    a.bg.hard_drop();
+    a.bg.next_queue();
+    a.bg.game_loop(false); 
+    a.bg.hard_drop();
+    a.bg.next_queue();
+    a.bg.game_loop(false); 
+    a.bg.hard_drop();
+}

@@ -6,3 +6,7 @@
 /client_app_output/static
 .idea
 /client_app_output/wserver
+/client_app_output/index.html
+client_app_output/web
+client_app_output/index.html
+upload_to_server.sh

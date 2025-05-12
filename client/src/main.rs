@@ -1,21 +1,18 @@
-use futures::FutureExt;
 use assets::Assets;
 use async_std::task::sleep;
+use blockstackers_core::blockstacker::BlockStacker;
+use blockstackers_core::buyo_game::{BType, BuyoBuyo};
 use enums::GameState;
-use futures::lock::{Mutex, MutexGuard};
-use gamehandler::GameHandler;
+use futures::lock::Mutex;
+use futures::FutureExt;
 use jstime::get_current_time;
 use network::NetworkConnection;
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::Duration,
-};
-use std::fmt::Display;
-use blockstackers_core::blockstacker::BlockStacker;
-use blockstackers_core::buyo_game::{BType, BuyoBuyo};
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use speedy2d::color::Color;
+use speedy2d::font::{TextLayout, TextOptions};
+use crate::gamehandler::GameHandler;
 
 fn main() {
     // let window = Window::new_centered("Title", (640, 480)).unwrap();
@@ -28,81 +25,10 @@ fn main() {
     wasm_logger::init(wasm_logger::Config::default());
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    log::info!("version 89");
+    log::info!("version 91");
+
     wasm_bindgen_futures::spawn_local(async move {
-        let mut state = Arc::new(Mutex::new(GameState::LoadingAssets));
-        let mut window = MyWindowHandler::new(state.clone());
-        let mut last_check = 0;
-        let url = window.assets.site_url.clone();
-        let mut net = Arc::new(Mutex::new(NetworkConnection::new(&url).await));
-        while window.assets.font.is_none() {
-            if get_current_time() - last_check > 1000 {
-                window.assets.load().await;
-                last_check = get_current_time();
-            }
-        }
-        *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
-        let game_loop = async {
-            let net = net.clone();
-            let state = state.clone();
-            let mut failed_to_send = false;
-            let mut last_send = 0;
-            loop {
-                log::info!("updating");
-                let mut changed = 0;
-                match *state.lock().await {
-                    GameState::Gaming(ref mut game_handler) => {
-                        changed = game_handler.update(get_current_time());
-                    }
-                    GameState::Menu => (),
-                    GameState::LoadingAssets => (),
-                }
-                if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 {
-                    match net.try_lock() {
-                        None => {log::info!("couldn't send"); failed_to_send = true},
-                        Some(mut x) => {
-                            last_send = get_current_time();
-                            failed_to_send = false;
-                            let game = &*state.lock().await;
-                            x.send(&network::serialize_game::<BuyoBuyo, BType>(game)).await;}
-                    }
-                }
-                sleep(Duration::from_millis(100)).await;
-            }
-        };
-        let network_loop = async {
-            let net = net.clone();
-            let state = state.clone();
-            loop {
-                loop {
-                    let a = match net.try_lock() {
-                        None => {None}
-                        Some(mut x) => {
-                            futures::select! {
-                            a = x.next().fuse() => {a}
-                            b = sleep(Duration::from_millis(5)).fuse() => {None}
-                        }
-                        }
-                    };
-                    match a {
-                        None => {break;}
-                        Some(x) => {
-                            let addr = x.split(":: ").next().unwrap().to_string();
-                            log::info!("addr: {}", addr);
-                            let game = network::deserialize_game(&x);
-                            state.lock().await.add_player(addr, game);
-                        }
-                    };
-                }
-                
-                // log::info!("{}", a.unwrap_or("nothing".to_owned()));
-                sleep(Duration::from_millis(100)).await;
-            }
-        };
-        let draw_loop = async {
-            WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
-        };
-        futures::join!(game_loop, draw_loop, network_loop);
+        start_game().await;
     });
 }
 
@@ -111,6 +37,113 @@ mod enums;
 mod gamehandler;
 mod jstime;
 mod network;
+mod draw_scaled;
+
+async fn start_game() {
+    let state = Arc::new(Mutex::new(GameState::LoadingAssets));
+    let mut window = MyWindowHandler::new(state.clone());
+
+    {
+        let mut last_check = 0;
+        while window.assets.font.is_none() {
+            if get_current_time() - last_check > 1000 {
+                window.assets.load().await;
+                last_check = get_current_time();
+            }
+        }
+    }
+
+    let ws_url = window.assets.ws_url().await;
+    let net = NetworkConnection::new(&ws_url).await;
+    let net = match net {
+        Ok(net) => net,
+        Err(E) => {
+            *state.lock().await = GameState::Error(E.to_string());
+            WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
+            log::error!("Failed to connect to websocket server");
+            return;
+        }
+    };
+    let net = Arc::new(Mutex::new(net));
+
+    *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
+    // let network_loop =
+    let draw_loop = async {
+        WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
+    };
+    futures::join!(
+            game_loop(net.clone(), state.clone()),
+            draw_loop,
+            network_loop(net.clone(), state.clone())
+        );
+}
+
+async fn network_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameState>>) {
+    loop {
+        loop {
+            let a = match net.try_lock() {
+                None => None,
+                Some(mut x) => {
+                    futures::select! {
+                        a = x.next().fuse() => {a}
+                        _ = sleep(Duration::from_millis(5)).fuse() => {None}
+                    }
+                }
+            };
+            match a {
+                None => {
+                    break;
+                }
+                Some(x) => {
+                    let addr = x.split(":: ").next().unwrap().to_string();
+                    log::info!("addr: {}", addr);
+                    let game = network::deserialize_game(&x);
+                    state.lock().await.add_player(addr, game);
+                }
+            };
+        }
+
+        // log::info!("{}", a.unwrap_or("nothing".to_owned()));
+        sleep(Duration::from_millis(100)).await;
+    }
+}
+
+async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameState>>) {
+    let mut failed_to_send = false;
+    let mut last_send = 0;
+    let mut key_pressed = false;
+    loop {
+        log::info!("updating");
+        let mut changed = 0;
+        match *state.lock().await {
+            GameState::Gaming(ref mut game_handler) => {
+                changed = game_handler.update(get_current_time());
+                key_pressed = game_handler.key_pressed;
+                if key_pressed {game_handler.key_pressed = false;}
+            }
+            GameState::Menu() => (),
+            GameState::LoadingAssets => (),
+            GameState::Error(_) => {panic!("Invalid game state")}
+        }
+        if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 || key_pressed {
+            key_pressed = false;
+            match net.try_lock() {
+                None => {
+                    log::info!("couldn't send");
+                    failed_to_send = true
+                }
+                Some(mut x) => {
+                    last_send = get_current_time();
+                    failed_to_send = false;
+                    let game = &*state.lock().await;
+                    x.send(&network::serialize_game::<BuyoBuyo, BType>(game))
+                        .await;
+                }
+            }
+        }
+        sleep(Duration::from_millis(50)).await;
+    }
+}
 
 struct MyWindowHandler {
     state: Arc<Mutex<GameState>>,
@@ -147,13 +180,25 @@ impl WindowHandler for MyWindowHandler {
             }
         }) {
             GameState::Gaming(ref game_handler) => {
+                graphics.clear_screen(Color::WHITE);
                 game_handler.draw(graphics, &self.assets);
                 helper.request_redraw();
             }
-            GameState::Menu => todo!(),
+            GameState::Menu() => {
+            },
             GameState::LoadingAssets => {}
+            GameState::Error(ref E) => {
+                let error = &self.assets.font.as_ref().unwrap().layout_text(
+                    &format!("Error: {}", E),
+                    20.0,
+                    TextOptions::new(),
+                );
+                graphics.draw_text((0.0, 0.0), Color::BLACK, &error);
+                helper.request_redraw();
+            }
         }
     }
+
     fn on_key_down(
         &mut self,
         _helper: &mut WindowHelper<()>,
