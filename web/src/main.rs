@@ -1,44 +1,20 @@
-use axum::extract::Query;
-use axum::{
-    Json,
-    extract::State,
-    http::StatusCode,
-    response::Html,
-    routing::{get, post},
-};
-use std::env;
-use std::fs;
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio::time::sleep;
+use std::{collections::HashMap, sync::Arc};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
-
 use axum::{
     Router,
     body::Bytes,
     extract::ws::{Message, Utf8Bytes, WebSocket, WebSocketUpgrade},
-    response::IntoResponse,
-    routing::any,
+    extract::Query,
+    response::{IntoResponse, Html},
+    routing::{any, get},
 };
-use axum_extra::{TypedHeader, headers};
-
-use std::ops::ControlFlow;
-use std::{net::SocketAddr, path::PathBuf};
-
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-
-//allows to extract the IP of connecting user
-use axum::extract::connect_info::ConnectInfo;
-use axum::extract::ws::CloseFrame;
-
-//allows to split the websocket stream into separate TX and RX branches
-use futures::{FutureExt, lock::Mutex, sink::SinkExt, stream::StreamExt};
-
+use futures::lock::Mutex;
 use lazy_static::lazy_static;
-
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
+mod websockets;
 
 #[derive(Clone)]
 struct AppState {
@@ -57,6 +33,8 @@ impl AppState {
 
 lazy_static! {
     static ref state: AppState = AppState::new();
+    // invalidate cache
+    static ref version: i128 = fastrand::Rng::new().i128(0..99999999);
 }
 
 #[tokio::main]
@@ -67,8 +45,9 @@ async fn main() {
         .route("/", get(root))
         .route("/query", get(query))
         .route("/game", get(game))
+        .route("/lobbies", get(lobbies))
         .route("/game/ws", get(url))
-        .route("/ws", any(ws_handler))
+        .route("/ws", any(websockets::ws_handler))
         .route("/cookies", get(cooky))
         .nest_service("/static", ServeDir::new("client_app_output/static"))
         .layer(CookieManagerLayer::new());
@@ -77,17 +56,71 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
+fn generate_template(style: Option<&str>, body: &str) -> Html<String> {
+    Html(format!("
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta content=\"text/html;charset=utf-8\" http-equiv=\"Content-Type\"/>
+    <style>
+{}
+    </style>
+</head>
+
+<body>
+
+{}
+
+</body>
+</html>
+    ", style.unwrap_or(""), body))
+}
+
+fn generate_menu(links: Vec<(&str, &str)>) -> Html<String> {
+    let header = "<h1><a href=\"/\">PPTE</a></h1>".to_string();
+    let body = links.iter().fold(header, 
+|acc, cur| acc + &format!("<h2><a href=\"{}\">{}</a></h2>", cur.0, cur.1) );
+    generate_template(None, &body)
+}
+
 async fn root() -> Html<String> {
-    // let contents = fs::read_to_string("client_app_output/index.html").unwrap().to_string();
-    let contents = "bruh".to_string();
-    Html(contents)
+    let contents = "
+    <h1>PPTE</h1>
+    <h2><a href=\"lobbies\">multiplayer</a></h2>
+    <h2><a href=\"solo\">solo</a></h2>
+    <h2><a href=\"settings\">settings</h2>
+    ";
+    // generate_template(None, contents)
+    generate_menu(vec![("lobbies", "multiplayer"), ("solo", "solo"), ("settings", "settings")])
+}
+
+async fn lobbies() -> Html<String> {
+    generate_menu(vec![("game?m=quickplay", "quickplay"), ("rooms", "rooms")])
 }
 
 async fn game() -> Html<String> {
-    let contents = fs::read_to_string("client_app_output/index.html")
-        .unwrap()
-        .to_string();
-    Html(contents)
+    let header = "<h1><a href=\"/\">PPTE</a></h1>".to_string();
+    let contents = header + &format!("<canvas id=\"my_canvas\"></canvas>
+
+<script type=\"module\" src=\"./static/client.js?v={}\"></script>
+
+<script type=\"module\">
+      import main from \"./static/client.js?v={}\";
+      main();
+</script>", version.to_string(), version.to_string());
+    let style = "<style>
+        body {
+            margin: 0px;
+            padding: 0px;
+        }
+        canvas#my_canvas {
+			position: absolute;
+            width: 95%;
+            height: 80%;
+        }
+    </style>";
+    generate_template(Some(style), &contents)
 }
 
 async fn url() -> &'static str {
@@ -111,49 +144,3 @@ async fn cooky(cookies: Cookies) -> String {
     format!("You've been here {} times before", visits)
 }
 
-async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket))
-}
-
-/// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(socket: WebSocket) {
-    let id = state.counter.lock().await.clone();
-    *state.counter.lock().await += 1;
-    println!("{} connected", id);
-    state.connections.lock().await.insert(id, socket);
-    'progress: loop {
-        let echo_to_all_connections = async {
-            let mut mutex_guard = state.connections.lock().await;
-            let (_sender, mut reciever) = mutex_guard.get_mut(&id).unwrap().split();
-            if let Some(Ok(msg)) = reciever.next().await {
-                drop(reciever);
-                drop(_sender);
-                let msg = axum::extract::ws::Message::Text(
-                    Utf8Bytes::try_from(format!(
-                        "{}:: {}",
-                        id,
-                        msg.into_text().unwrap().to_string()
-                    ))
-                    .unwrap(),
-                );
-                for socket in mutex_guard.iter_mut() {
-                    if socket.1.send(msg.clone()).await.is_err() {
-                        println!("unable to send to {}", id);
-                        return false;
-                    }
-                }
-            }
-            return true;
-        };
-        let output = futures::select! {
-            out = echo_to_all_connections.fuse() => {out}
-            _ = sleep(Duration::from_millis(5)).fuse() => {true}
-        };
-        if !output {
-            break 'progress;
-        }
-        sleep(Duration::from_millis(100)).await
-    }
-    state.connections.lock().await.remove(&id);
-    println!("{} disconnected", id);
-}

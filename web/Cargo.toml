@@ -12,3 +12,4 @@ futures = "0.3.31"
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
 lazy_static = "1.5.0"
 tower-cookies = "0.11.0"
+fastrand = "2.3.0"

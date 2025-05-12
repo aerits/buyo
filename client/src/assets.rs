@@ -34,7 +34,7 @@ impl Assets {
         }
     }
     pub async fn ws_url(&self) -> String {
-        let url = self.load_var(&(self.site_url.clone() + "/ws")).await;
+        let url = self.load_var("/game/ws").await;
         match url {
             Some(x) => from_utf8(&x).unwrap().trim().to_string(),
             None => panic!("server_url not found"),
