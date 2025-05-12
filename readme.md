@@ -14,6 +14,3 @@ the plan is to have a webgame that is similar to tetrio but with more block stac
 
 # why wasm
 i hate javascript, no javascript will every be committed to this repo
-
-# why python server
-the brains of the app should be in the webapp, and if theres anything that runs too slow in python, i'll just make a rust module for python
