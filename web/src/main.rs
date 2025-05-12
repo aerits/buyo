@@ -49,6 +49,7 @@ async fn main() {
         .route("/game/ws", get(url))
         .route("/ws", any(websockets::ws_handler))
         .route("/cookies", get(cooky))
+        .route("/fake_login_cookie", get(fake_login_cookie))
         .nest_service("/static", ServeDir::new("client_app_output/static"))
         .layer(CookieManagerLayer::new());
 
@@ -62,6 +63,7 @@ fn generate_template(style: Option<&str>, body: &str) -> Html<String> {
 <html>
 
 <head>
+    <title>PPTE</title>
     <meta content=\"text/html;charset=utf-8\" http-equiv=\"Content-Type\"/>
     <style>
 {}
@@ -84,19 +86,29 @@ fn generate_menu(links: Vec<(&str, &str)>) -> Html<String> {
     generate_template(None, &body)
 }
 
-async fn root() -> Html<String> {
-    let contents = "
-    <h1>PPTE</h1>
-    <h2><a href=\"lobbies\">multiplayer</a></h2>
-    <h2><a href=\"solo\">solo</a></h2>
-    <h2><a href=\"settings\">settings</h2>
-    ";
-    // generate_template(None, contents)
-    generate_menu(vec![("lobbies", "multiplayer"), ("solo", "solo"), ("settings", "settings")])
+async fn root(cookies: Cookies) -> Html<String> {
+    let logged_in = cookies
+        .get("login_token")
+        .is_some();
+    let login_link = if logged_in {
+        (format!("u/{}", cookies.get("login_token").unwrap().value()),
+        format!("{}", cookies.get("login_token").unwrap().value())
+    )
+    } else {("login".to_owned(), "login".to_owned())};
+    let login_link = (login_link.0.as_str(), login_link.1.as_str());
+    generate_menu(vec![("lobbies", "multiplayer"), ("solo", "solo"), ("leaderboard", "leaderboard"), ("settings", "settings"), login_link])
 }
 
 async fn lobbies() -> Html<String> {
     generate_menu(vec![("game?m=quickplay", "quickplay"), ("rooms", "rooms")])
+}
+
+async fn solo() -> Html<String> {
+    generate_menu(vec![("game?m=40lines", "blocks: 40 lines"), ("game?m=2min", "blocks: 2 minutes")])
+}
+
+async fn settings() -> Html<String> {
+    todo!()
 }
 
 async fn game() -> Html<String> {
@@ -106,8 +118,9 @@ async fn game() -> Html<String> {
 <script type=\"module\" src=\"./static/client.js?v={}\"></script>
 
 <script type=\"module\">
-      import main from \"./static/client.js?v={}\";
-      main();
+        document.getElementById(\"my_canvas\").focus();
+        import main from \"./static/client.js?v={}\";
+        main();
 </script>", version.to_string(), version.to_string());
     let style = "<style>
         body {
@@ -124,7 +137,7 @@ async fn game() -> Html<String> {
 }
 
 async fn url() -> &'static str {
-    "http://localhost:5000/ws"
+    "https://erm.0000727.xyz/ws"
 }
 
 async fn query(Query(params): Query<HashMap<String, String>>) -> Html<String> {
@@ -142,5 +155,16 @@ async fn cooky(cookies: Cookies) -> String {
         .unwrap_or(0);
     cookies.add(Cookie::new("visits", (visits + 1).to_string()));
     format!("You've been here {} times before", visits)
+}
+
+async fn fake_login_cookie(Query(params): Query<HashMap<String, String>>, cookies: Cookies) -> String {
+    let contents = match params.get("username") {
+        Some(x) => {
+            cookies.add(Cookie::new("login_token", x.clone()));
+            x.clone()
+        },
+        None => {"no username provided".to_owned()},
+    };
+    contents
 }
 

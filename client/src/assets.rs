@@ -34,11 +34,7 @@ impl Assets {
         }
     }
     pub async fn ws_url(&self) -> String {
-        let url = self.load_var("/game/ws").await;
-        match url {
-            Some(x) => from_utf8(&x).unwrap().trim().to_string(),
-            None => panic!("server_url not found"),
-        }
+        return "/ws".to_string()
     }
     async fn load_var(&self, url: &str) -> Option<Vec<u8>> {
         // Create a new RequestInit object
