@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 use std::str::from_utf8;
->>>>>>> quickplay
 use speedy2d::font::Font;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys, wasm_bindgen::JsCast, Request, RequestInit, Response};
