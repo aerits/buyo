@@ -4,6 +4,7 @@
     - add a swap gamemode
 - change the gameloop method to be less scuffed
 - make better graphics
+    - have smooth falling blocks for gravity
 - create custom font
 - add tetrio quickplay v1
     - [x] see other players
