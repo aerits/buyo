@@ -1,10 +1,19 @@
-- add display to game
-    - add a game menu
-- build a block stacking game like tetrio
+- [x] add display to game
+    - [x] add a game menu
+- [x] build a block stacking game like tetrio
     - add a swap gamemode
 - change the gameloop method to be less scuffed
-- fix scoring
 - make better graphics
 - create custom font
 - add tetrio quickplay v1
+    - [x] see other players
+    - allow attacks
+    - add death and spectating
+- create main menu -- in progress
+    - create every page
+    - add logging in
+    - add settings
+    - use css to style the page
+    - create an actual header
+- add singleplayer modes
 - make size of display relative to the window size
