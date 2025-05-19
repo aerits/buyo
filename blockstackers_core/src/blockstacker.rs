@@ -14,7 +14,7 @@ pub trait BlockStacker {
     fn new(width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Self;
     fn get_board(&self) -> HashMap<BVec, Sprite>;
     fn next_queue(&self) -> HashMap<BVec, Sprite>;
-    fn get_controlled_block(&self) -> HashMap<BVec, Sprite>;
+    fn get_controlled_block(&self) -> Vec<(f32, f32, Sprite)>;
     fn input_left(&mut self) -> bool;
     fn input_right(&mut self) -> bool;
     fn input_rotation_right(&mut self);
@@ -41,6 +41,6 @@ pub struct Tuning {
 
 impl Tuning {
     pub fn new() -> Tuning {
-        Tuning { das: 133, arr: 5, lock_delay: 100, freeze_delay: 0, clear_delay: 500, spawn_delay: 0, fall_speed: 500 }
+        Tuning { das: 133, arr: 5, lock_delay: 20, freeze_delay: 1000, clear_delay: 500, spawn_delay: 0, fall_speed: 200 }
     }
 }

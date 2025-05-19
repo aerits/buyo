@@ -26,6 +26,7 @@ enum LoopState {
     Locking,
     OnFloor(u64), // u64 is timestamp of landing on floor
     Chaining,
+    Gravity(f32),
 }
 
 impl color for BType {
@@ -60,11 +61,11 @@ fn to_sprite(i: i32) -> Sprite {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, PartialEq)]
 struct Buyo {
     p: BVec,
-    offset_x: i32,
-    offset_y: i32,
+    offset_x: f32,
+    offset_y: f32,
     t: Sprite,
 }
 
@@ -106,7 +107,7 @@ impl Tables {
 
 pub struct BuyoBuyo {
     buyos: HashMap<BVec, Sprite>,
-    buyo_block_offsets: HashMap<BVec, f32>,
+    buyos_not_on_grid: Vec<Buyo>,
     controlled_buyo: Option<(Buyo, Buyo)>,
     randomizer: Randomizer,
     puyos_cleared: i32,           // -- for scoring --
@@ -133,7 +134,7 @@ impl BlockStacker for BuyoBuyo {
         }
         BuyoBuyo {
             buyos,
-            buyo_block_offsets: HashMap::new(),
+            buyos_not_on_grid: Vec::new(),
             controlled_buyo: None,
             randomizer,
             puyos_cleared: 0,
@@ -157,14 +158,17 @@ impl BlockStacker for BuyoBuyo {
         map.insert(BVec::new(0, 1), a.1.clone());
         return map;
     }
-    fn get_controlled_block(&self) -> HashMap<BVec, Sprite> {
-        let mut a = HashMap::new();
+    fn get_controlled_block(&self) -> Vec<(f32, f32, Sprite)> {
+        let mut a = Vec::new();
         match self.controlled_buyo {
             Some(x) => {
-                a.insert(x.0.p, x.0.t);
-                a.insert(x.1.p, x.1.t);
+                a.push((x.0.p.x as f32, x.0.p.y as f32 + x.0.offset_y, x.0.t));
+                a.push((x.1.p.x as f32, x.1.p.y as f32 + x.1.offset_y, x.1.t));
             }
             None => (),
+        }
+        for b in self.buyos_not_on_grid.iter() {
+            a.push((b.p.x as f32, b.p.y as f32 + b.offset_y, b.t))
         }
         return a;
     }
@@ -217,7 +221,6 @@ impl BlockStacker for BuyoBuyo {
     /// returns true if something changed
     fn game_loop(&mut self, last_update_time: u64, current_time: u64) -> bool {
         let delta_time = current_time - last_update_time;
-        println!("time: {delta_time}, state: {:?}", self.loop_state);
         match self.loop_state {
             LoopState::SpawnNew => {
                 if delta_time < self.tuning.spawn_delay {
@@ -227,14 +230,14 @@ impl BlockStacker for BuyoBuyo {
                 let b1 = Buyo {
                     p: BVec::new(3, 2),
                     t: to_sprite(self.randomizer.next()),
-                    offset_x: 0,
-                    offset_y: 0
+                    offset_x: 0.0,
+                    offset_y: 0.0
                 };
                 let b2 = Buyo {
                     p: &b1.p + &BVec::new(0, -1),
                     t: to_sprite(self.randomizer.next()),
-                    offset_x: 0,
-                    offset_y: 0
+                    offset_x: 0.0,
+                    offset_y: 0.0
                 };
                 self.spawn_c_buyo((b1, b2));
                 self.loop_state = LoopState::Falling;
@@ -244,48 +247,96 @@ impl BlockStacker for BuyoBuyo {
                 if delta_time < self.tuning.fall_speed {
                     return false;
                 }
+                if self.is_on_ground() {
+                    self.loop_state = LoopState::OnFloor(current_time);
+                    let b = match &mut self.controlled_buyo {
+                        Some(b) => b,
+                        None => return false,
+                    };
+                    b.0.offset_y = 0.0;
+                    b.1.offset_y = 0.0;
+                }
                 let b = match &mut self.controlled_buyo {
                     Some(b) => b,
                     None => return false,
                 };
-                b.0.offset_y += (0.5 * 100.0) as i32;
-                b.1.offset_y += (0.5 * 100.0) as i32;
-                println!("offset: {:?}", b.0.offset_y);
-                if b.0.offset_y as f32 / 100.0 > 1f32 {
+                b.0.offset_y += 0.1;
+                b.1.offset_y += 0.1;
+                // println!("offset: {:?}", b.0.offset_y);
+                if b.0.offset_y as f32 > 1f32 {
                     // has moved into the next square
-                    b.0.offset_y = 0;
-                    b.1.offset_y = 0;
-                    let on_ground = !self.move_c_buyo_down();
-                    if on_ground {
-                        self.loop_state = LoopState::OnFloor(current_time);
-                    }
+                    b.0.offset_y = 0.0;
+                    b.1.offset_y = 0.0;
+                    
+                    self.move_c_buyo_down();
+                    
                 }
+                
             }
             LoopState::Locking => {
                 // todo let you leave lock state back to falling state
                 if self.tuning.lock_delay < delta_time {
-                    self.loop_state = LoopState::Chaining;
+                    self.loop_state = LoopState::Gravity(0.0);
                 } else {
                     return false;
                 }
             }
             LoopState::OnFloor(time) => {
+                if !self.is_on_ground() {
+                    self.loop_state = LoopState::Falling;
+                    return true;
+                }
                 if current_time - time < self.tuning.freeze_delay {
                     return false;
                 }
+                if !self.is_on_ground() {
+                    self.loop_state = LoopState::Falling;
+                    return true;
+                }
                 self.freeze_c_buyo();
                 self.loop_state = LoopState::Locking;
-            }
+            },
+            LoopState::Gravity(mut velocity) => {
+                if delta_time < 20 {
+                    return false;
+                }
+                self.init_gravity();
+                const ACCELERATION: f32 = 1.0;
+                velocity += ACCELERATION;
+                let mut index_to_remove: Vec<(usize, i32)> = Vec::new();
+                // apply gravity on each buyo
+                for (i, buyo) in self.buyos_not_on_grid.iter_mut().enumerate() {
+                    buyo.offset_y += velocity;
+                    let pos_y = buyo.p.y + buyo.offset_y.floor() as i32;
+                    if self.buyos.contains_key(&BVec::new(buyo.p.x, pos_y + 1)) {
+                        index_to_remove.push((i, pos_y));
+                    }
+                } // if the buyo hits another buyo while falling (remember positive y goes down), it stops moving
+                for (i, pos_y) in index_to_remove.iter() {
+                    let b = self.buyos_not_on_grid[*i];
+                    self.buyos.insert(BVec::new(b.p.x, *pos_y), b.t);
+                }
+                for (i, _) in index_to_remove {
+                    self.buyos_not_on_grid.swap_remove(i);
+                }
+                if self.buyos_not_on_grid.len() == 0 {
+                    self.loop_state = LoopState::Chaining;
+                }
+            },
             LoopState::Chaining => {
                 if delta_time < self.tuning.clear_delay {
                     return false;
                 }
-                let b = self.pop_buyos();
-                if b.0 == false {
+                self.pop_buyos();
+                self.init_gravity();
+                if self.buyos_not_on_grid.len() == 0 {
                     self.loop_state = LoopState::SpawnNew;
+                } else {
+                    self.loop_state = LoopState::Gravity(0.0);
                 }
             }
         }
+        println!("{:?}", self.loop_state);
         return true;
     }
 }
@@ -408,33 +459,48 @@ impl BuyoBuyo {
         return (type_b, type_a);
     }
     // for every buyo in buyos, move them down as gravity would move them
-    fn gravity(&mut self) -> bool {
-        let mut moved = false;
-        for (b, c) in self.buyos.clone() {
-            if c != Sprite::Wall {
-                let mut b1 = b.clone();
-                b1.add_i(0, 1); // move buyo down and check if theres a collision
-                while !self.buyos.contains_key(&b1) {
-                    b1.add_i(0, 1); // while there aren't collisions keep moving down
-                }
-                b1.add_i(0, -1); // buyo is inside another buyo, so it needs to get moved up
-                self.buyos.remove(&b);
-                self.buyos.insert(b1, c);
-                if b1 != b {
-                    moved = true;
-                }
+    // fn gravity(&mut self) -> bool {
+    //     let mut moved = false;
+    //     for (b, c) in self.buyos.clone() {
+    //         if c != Sprite::Wall {
+    //             let mut b1 = b.clone();
+    //             b1.add_i(0, 1); // move buyo down and check if theres a collision
+    //             while !self.buyos.contains_key(&b1) {
+    //                 b1.add_i(0, 1); // while there aren't collisions keep moving down
+    //             }
+    //             b1.add_i(0, -1); // buyo is inside another buyo, so it needs to get moved up
+    //             self.buyos.remove(&b);
+    //             self.buyos.insert(b1, c);
+    //             if b1 != b {
+    //                 moved = true;
+    //             }
+    //         }
+    //     }
+    //     moved
+    // }
+    fn init_gravity(&mut self) {
+        let mut buyos_to_move: Vec<BVec> = Vec::new();
+        for (v, s) in self.buyos.iter() {
+            if *s == Sprite::Wall {
+                continue;
+            }
+            if !self.buyos.contains_key(&(v - &BVec::new(0, -1))) {
+                buyos_to_move.push(*v);
             }
         }
-        moved
+        for v in buyos_to_move {
+            let sprite = self.buyos.remove(&v).unwrap();
+            self.buyos_not_on_grid.push(Buyo { p: v, offset_x: 0.0, offset_y: 0.0, t: sprite });
+        }
     }
     // pop the buyos that are 4 or more of the same Color connecting
     // wall Color does not pop
     fn pop_buyos(&mut self) -> (bool, i32) {
-        let a = self.gravity();
-        if a {
-            while self.gravity() {}
-            return (true, 1);
-        }
+        // let a = self.gravity();
+        // if a {
+        //     while self.gravity() {}
+        //     return (true, 1);
+        // }
         self.color_bonus.clear();
         self.group_bonus.clear();
         self.puyos_cleared = 0;

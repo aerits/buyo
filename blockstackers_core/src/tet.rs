@@ -258,14 +258,15 @@ impl BlockStacker for Tet {
     //     todo!()
     // }
 
-    fn get_controlled_block(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
-        match &self.controlled_mino {
-            None => {HashMap::new()}
-            Some(c) => {c.vec.iter().fold(HashMap::new(), |mut acc, x| {
-                acc.insert(*x, c.color);
-                acc
-            })}
-        }
+    fn get_controlled_block(&self) -> Vec<(f32, f32, Sprite)> {
+        // match &self.controlled_mino {
+        //     None => {HashMap::new()}
+        //     Some(c) => {c.vec.iter().fold(HashMap::new(), |mut acc, x| {
+        //         acc.insert(*x, c.color);
+        //         acc
+        //     })}
+        // }
+        todo!()
     }
 
     fn input_left(&mut self) -> bool {
