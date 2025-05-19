@@ -5,7 +5,8 @@ use speedy2d::window::VirtualKeyCode;
 use std::collections::HashMap;
 
 pub enum GameState {
-    Gaming(GameHandler<BuyoBuyo, BType>),
+    // Gaming(GameHandler<BuyoBuyo, BType>),
+    Gaming(),
     Menu(),
     LoadingAssets,
     Error(String),

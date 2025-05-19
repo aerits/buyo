@@ -340,7 +340,6 @@ version = "0.1.0"
 dependencies = [
  "oorandom",
  "regex",
- "speedy2d",
 ]
 
 [[package]]

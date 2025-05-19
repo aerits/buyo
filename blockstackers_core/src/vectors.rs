@@ -1,7 +1,8 @@
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Sub};
+use std::hash::{Hash, Hasher};
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Copy, Debug)]
 pub struct BVec {
     pub x: i32,
     pub y: i32,

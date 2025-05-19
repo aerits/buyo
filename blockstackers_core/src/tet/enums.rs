@@ -34,3 +34,10 @@ pub enum Rotation {
     Down = 2,
     Left = 3,
 }
+
+pub enum LoopState {
+    Falling,
+    Spawning,
+    OnFloor(u64),
+    LockingOrClearing,
+}

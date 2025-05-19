@@ -1,10 +1,11 @@
+// use speedy2d::color::Color;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Display;
-use speedy2d::color::Color;
 
-use crate::blockstacker::{color, BlockStacker};
+use crate::blockstacker::{color, BlockStacker, Tuning};
 use crate::randomizer::Randomizer;
 use crate::vectors::BVec;
+use crate::Sprite;
 
 #[cfg(test)]
 mod tests;
@@ -18,10 +19,19 @@ pub enum BType {
     Wall,
 }
 
+#[derive(Debug)]
+enum LoopState {
+    SpawnNew,
+    Falling,
+    Locking,
+    OnFloor(u64), // u64 is timestamp of landing on floor
+    Chaining,
+}
+
 impl color for BType {
     fn from_str(color: &str) -> Option<Self>
     where
-        Self: Sized
+        Self: Sized,
     {
         match color.to_lowercase().as_str() {
             "red" => Some(BType::Red),
@@ -29,7 +39,7 @@ impl color for BType {
             "green" => Some(BType::Green),
             "purple" => Some(BType::Purple),
             "wall" => Some(BType::Wall),
-            _ => {None}
+            _ => None,
         }
     }
 }
@@ -40,12 +50,12 @@ impl Display for BType {
     }
 }
 
-fn to_btype(i: i32) -> BType {
+fn to_sprite(i: i32) -> Sprite {
     match i {
-        0 => BType::Red,
-        1 => BType::Blue,
-        2 => BType::Green,
-        3 => BType::Purple,
+        0 => Sprite::BuyoRed,
+        1 => Sprite::BuyoBlue,
+        2 => Sprite::BuyoGreen,
+        3 => Sprite::BuyoPurple,
         _ => panic!(),
     }
 }
@@ -53,7 +63,9 @@ fn to_btype(i: i32) -> BType {
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct Buyo {
     p: BVec,
-    t: BType,
+    offset_x: i32,
+    offset_y: i32,
+    t: Sprite,
 }
 
 struct Tables {
@@ -93,30 +105,35 @@ impl Tables {
 }
 
 pub struct BuyoBuyo {
-    buyos: HashMap<BVec, BType>,
+    buyos: HashMap<BVec, Sprite>,
+    buyo_block_offsets: HashMap<BVec, f32>,
     controlled_buyo: Option<(Buyo, Buyo)>,
     randomizer: Randomizer,
-    puyos_cleared: i32,          // -- for scoring --
-    chain_power: i32,            // indice for table
-    group_bonus: Vec<i32>,       // list of indices for table
-    color_bonus: HashSet<BType>, // len is indice for table
+    puyos_cleared: i32,           // -- for scoring --
+    chain_power: i32,             // indice for table
+    group_bonus: Vec<i32>,        // list of indices for table
+    color_bonus: HashSet<Sprite>, // len is indice for table
     tables: Tables,
     total_score: i32,
+
+    loop_state: LoopState, // -- for game loop
+    tuning: Tuning,
 }
 
-impl BlockStacker<BType> for BuyoBuyo {
+impl BlockStacker for BuyoBuyo {
     // create a game board
-    fn new(width: i32, height: i32, randomizer: Randomizer) -> Self {
+    fn new(width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Self {
         let mut buyos = HashMap::new();
         for x in 0..width + 2 {
             for y in 0..height + 2 {
                 if x == 0 || x == width + 1 || y == 0 || y == height + 1 {
-                    buyos.insert(BVec::new(x, y), BType::Wall);
+                    buyos.insert(BVec::new(x, y), Sprite::Wall);
                 }
             }
         }
         BuyoBuyo {
             buyos,
+            buyo_block_offsets: HashMap::new(),
             controlled_buyo: None,
             randomizer,
             puyos_cleared: 0,
@@ -125,29 +142,22 @@ impl BlockStacker<BType> for BuyoBuyo {
             color_bonus: HashSet::new(),
             tables: Tables::new(),
             total_score: 0,
+            loop_state: LoopState::SpawnNew,
+            tuning,
         }
     }
-    fn get_board(&self) -> HashMap<BVec, BType> {
+    fn get_board(&self) -> HashMap<BVec, Sprite> {
         let a = self.buyos.clone();
         return a;
     }
-    fn next_queue(&self) -> HashMap<BVec, BType> {
+    fn next_queue(&self) -> HashMap<BVec, Sprite> {
         let a = self.next_buyo();
         let mut map = HashMap::new();
         map.insert(BVec::new(0, 0), a.0.clone());
         map.insert(BVec::new(0, 1), a.1.clone());
         return map;
     }
-    fn convert_t_to_speedy2d_color(&self, t: &BType) -> speedy2d::color::Color {
-        match t {
-            BType::Red => Color::RED,
-            BType::Blue => Color::BLUE,
-            BType::Green => Color::GREEN,
-            BType::Purple => Color::MAGENTA,
-            BType::Wall => Color::BLACK,
-        }
-    }
-    fn get_controlled_block(&self) -> HashMap<BVec, BType> {
+    fn get_controlled_block(&self) -> HashMap<BVec, Sprite> {
         let mut a = HashMap::new();
         match self.controlled_buyo {
             Some(x) => {
@@ -159,10 +169,10 @@ impl BlockStacker<BType> for BuyoBuyo {
         return a;
     }
     fn input_left(&mut self) -> bool {
-        self.move_c_buyo_if_no_collision(BVec { x: -1, y: 0 })
+        self.move_c_buyo_if_no_collision(BVec::new(-1, 0))
     }
     fn input_right(&mut self) -> bool {
-        self.move_c_buyo_if_no_collision(BVec { x: 1, y: 0 })
+        self.move_c_buyo_if_no_collision(BVec::new(1, 0))
     }
     fn input_rotation_right(&mut self) {
         self.rotate_c_buyo(1);
@@ -174,11 +184,11 @@ impl BlockStacker<BType> for BuyoBuyo {
         self.rotate_c_buyo(2);
     }
     fn hard_drop(&mut self) {
-        while self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 }) {}
+        while self.move_c_buyo_if_no_collision(BVec::new(0, 1)) {}
         self.freeze_c_buyo();
     }
     fn move_c_buyo_down(&mut self) -> bool {
-        self.move_c_buyo_if_no_collision(BVec { x: 0, y: 1 })
+        self.move_c_buyo_if_no_collision(BVec::new(0, 1))
     }
     fn is_on_ground(&self) -> bool {
         match self.controlled_buyo {
@@ -204,33 +214,79 @@ impl BlockStacker<BType> for BuyoBuyo {
     fn total_score(&self) -> i32 {
         return self.total_score;
     }
-    // place this in a loop that also does detection of inputs and whatnot
-    // returns 1 if it just ran gravity
-    fn game_loop(&mut self, time_to_freeze: bool) -> i32 {
-        if self.controlled_buyo == None {
-            let a = self.pop_buyos();
-            if a.0 {
-                return a.1;
+    /// returns true if something changed
+    fn game_loop(&mut self, last_update_time: u64, current_time: u64) -> bool {
+        let delta_time = current_time - last_update_time;
+        println!("time: {delta_time}, state: {:?}", self.loop_state);
+        match self.loop_state {
+            LoopState::SpawnNew => {
+                if delta_time < self.tuning.spawn_delay {
+                    return false;
+                }
+                self.reset_chain();
+                let b1 = Buyo {
+                    p: BVec::new(3, 2),
+                    t: to_sprite(self.randomizer.next()),
+                    offset_x: 0,
+                    offset_y: 0
+                };
+                let b2 = Buyo {
+                    p: &b1.p + &BVec::new(0, -1),
+                    t: to_sprite(self.randomizer.next()),
+                    offset_x: 0,
+                    offset_y: 0
+                };
+                self.spawn_c_buyo((b1, b2));
+                self.loop_state = LoopState::Falling;
             }
-            // no more buyos to pop
-            self.reset_chain();
-            let b1 = Buyo {
-                p: BVec { x: 3, y: 2 },
-                t: to_btype(self.randomizer.next()),
-            };
-            let b2 = Buyo {
-                p: &b1.p + &BVec { x: 0, y: -1 },
-                t: to_btype(self.randomizer.next()),
-            };
-            self.spawn_c_buyo((b1, b2));
-            return 0;
+            LoopState::Falling => {
+                if self.controlled_buyo.is_none() {self.loop_state = LoopState::Locking; return false;}
+                if delta_time < self.tuning.fall_speed {
+                    return false;
+                }
+                let b = match &mut self.controlled_buyo {
+                    Some(b) => b,
+                    None => return false,
+                };
+                b.0.offset_y += (0.5 * 100.0) as i32;
+                b.1.offset_y += (0.5 * 100.0) as i32;
+                println!("offset: {:?}", b.0.offset_y);
+                if b.0.offset_y as f32 / 100.0 > 1f32 {
+                    // has moved into the next square
+                    b.0.offset_y = 0;
+                    b.1.offset_y = 0;
+                    let on_ground = !self.move_c_buyo_down();
+                    if on_ground {
+                        self.loop_state = LoopState::OnFloor(current_time);
+                    }
+                }
+            }
+            LoopState::Locking => {
+                // todo let you leave lock state back to falling state
+                if self.tuning.lock_delay < delta_time {
+                    self.loop_state = LoopState::Chaining;
+                } else {
+                    return false;
+                }
+            }
+            LoopState::OnFloor(time) => {
+                if current_time - time < self.tuning.freeze_delay {
+                    return false;
+                }
+                self.freeze_c_buyo();
+                self.loop_state = LoopState::Locking;
+            }
+            LoopState::Chaining => {
+                if delta_time < self.tuning.clear_delay {
+                    return false;
+                }
+                let b = self.pop_buyos();
+                if b.0 == false {
+                    self.loop_state = LoopState::SpawnNew;
+                }
+            }
         }
-        // interpolate this on graphics
-        if time_to_freeze {
-            self.freeze_c_buyo();
-            return 0;
-        }
-        return 0;
+        return true;
     }
 }
 
@@ -340,13 +396,13 @@ impl BuyoBuyo {
         }
         true
     }
-    pub fn next_buyo(&self) -> (BType, BType) {
+    pub fn next_buyo(&self) -> (Sprite, Sprite) {
         let crnt_ptr = self.randomizer.current_pointer();
-        let type_a = to_btype(self.randomizer.get(crnt_ptr + 1));
-        let type_b = to_btype(self.randomizer.get(crnt_ptr + 2));
+        let type_a = to_sprite(self.randomizer.get(crnt_ptr + 1));
+        let type_b = to_sprite(self.randomizer.get(crnt_ptr + 2));
         if crnt_ptr == 0 {
-            let type_a = to_btype(self.randomizer.get(crnt_ptr + 3));
-            let type_b = to_btype(self.randomizer.get(crnt_ptr + 4));
+            let type_a = to_sprite(self.randomizer.get(crnt_ptr + 3));
+            let type_b = to_sprite(self.randomizer.get(crnt_ptr + 4));
             return (type_b, type_a);
         }
         return (type_b, type_a);
@@ -355,7 +411,7 @@ impl BuyoBuyo {
     fn gravity(&mut self) -> bool {
         let mut moved = false;
         for (b, c) in self.buyos.clone() {
-            if c != BType::Wall {
+            if c != Sprite::Wall {
                 let mut b1 = b.clone();
                 b1.add_i(0, 1); // move buyo down and check if theres a collision
                 while !self.buyos.contains_key(&b1) {
@@ -385,7 +441,7 @@ impl BuyoBuyo {
         let mut change_in_score = self.score();
         let mut has_popped: bool = false;
         for (b, c) in self.buyos.clone() {
-            if &c == &BType::Wall {
+            if &c == &Sprite::Wall {
                 continue;
             }
             let mut count = 0;
@@ -397,10 +453,10 @@ impl BuyoBuyo {
                 let current = q.pop_back().unwrap();
                 count += 1;
                 let adjacent_nodes = vec![
-                    &current + &BVec { x: 0, y: 1 },
-                    &current + &BVec { x: 0, y: -1 },
-                    &current + &BVec { x: 1, y: 0 },
-                    &current + &BVec { x: -1, y: 0 },
+                    &current + &BVec::new(0, 1),
+                    &current + &BVec::new(0, -1),
+                    &current + &BVec::new(1, 0),
+                    &current + &BVec::new(-1, 0),
                 ];
                 for neighbor in adjacent_nodes {
                     if self.buyos.get(&neighbor) == Some(&c) && !visited.contains(&neighbor) {
@@ -467,11 +523,13 @@ impl BuyoBuyo {
             let grid_x = (bvec.x - min_x) as usize;
             let grid_y = (bvec.y - min_y) as usize;
             grid[grid_y][grid_x] = match btype {
-                BType::Red => 'R',
-                BType::Blue => 'B',
-                BType::Green => 'G',
-                BType::Purple => 'P',
-                BType::Wall => '#',
+                Sprite::BuyoRed => 'R',
+                Sprite::BuyoBlue => 'B',
+                Sprite::BuyoGreen => 'G',
+                Sprite::BuyoPurple => 'P',
+                Sprite::BuyoYellow => 'Y',
+                Sprite::Wall => '#',
+                _ => panic!(),
             };
         }
 

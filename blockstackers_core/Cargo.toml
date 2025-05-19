@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 oorandom = "11.1.5"
 regex = "1.11.1"
-speedy2d = {version = "2.1.0", features = []}
+# speedy2d = {version = "2.1.0", features = []}

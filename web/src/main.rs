@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::{DefaultHasher, Hash}, sync::Arc};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
@@ -44,10 +44,17 @@ async fn main() {
     let app = Router::new()
         .route("/", get(root))
         .route("/query", get(query))
+
         .route("/game", get(game))
         .route("/lobbies", get(lobbies))
+
+        .route("/login", get(login))
+        .route("/login_action", get(login_action))
+        .route("/sign_out", get(sign_out))
+
         .route("/game/ws", get(url))
         .route("/ws", any(websockets::ws_handler))
+
         .route("/cookies", get(cooky))
         .route("/fake_login_cookie", get(fake_login_cookie))
         .nest_service("/static", ServeDir::new("client_app_output/static"))
@@ -65,9 +72,7 @@ fn generate_template(style: Option<&str>, body: &str) -> Html<String> {
 <head>
     <title>PPTE</title>
     <meta content=\"text/html;charset=utf-8\" http-equiv=\"Content-Type\"/>
-    <style>
 {}
-    </style>
 </head>
 
 <body>
@@ -79,8 +84,12 @@ fn generate_template(style: Option<&str>, body: &str) -> Html<String> {
     ", style.unwrap_or(""), body))
 }
 
+fn generate_header() -> String {
+    "<h1><a href=\"/\">PPTE</a></h1>".to_string()
+}
+
 fn generate_menu(links: Vec<(&str, &str)>) -> Html<String> {
-    let header = "<h1><a href=\"/\">PPTE</a></h1>".to_string();
+    let header = generate_header();
     let body = links.iter().fold(header, 
 |acc, cur| acc + &format!("<h2><a href=\"{}\">{}</a></h2>", cur.0, cur.1) );
     generate_template(None, &body)
@@ -96,7 +105,9 @@ async fn root(cookies: Cookies) -> Html<String> {
     )
     } else {("login".to_owned(), "login".to_owned())};
     let login_link = (login_link.0.as_str(), login_link.1.as_str());
-    generate_menu(vec![("lobbies", "multiplayer"), ("solo", "solo"), ("leaderboard", "leaderboard"), ("settings", "settings"), login_link])
+    let mut links = vec![("lobbies", "multiplayer"), ("solo", "solo"), ("leaderboard", "leaderboard"), ("settings", "settings"), login_link];
+    if logged_in {links.push(("sign_out", "sign out"))}
+    generate_menu(links)
 }
 
 async fn lobbies() -> Html<String> {
@@ -111,6 +122,36 @@ async fn settings() -> Html<String> {
     todo!()
 }
 
+async fn login() -> Html<String> {
+    let header = generate_header();
+    let body = header + "
+    <form action=\"/login_action\">
+    <label for=\"username\">username: </label><br>
+    <input type=\"text\" id=\"username\" name=\"username\"><br>
+    <label for=\"password\">password: </label><br>
+    <input type=\"password\" id=\"password\" name=\"password\"><br>
+    <input type=\"submit\" value=\"login\">
+    </form>
+    ";
+    generate_template(None, &body)
+}
+
+async fn login_action(Query(params): Query<HashMap<String, String>>, cookies: Cookies) -> Html<String> {
+    let mut body = generate_header();
+    let username = params.get("username").map(|x| x.clone()).unwrap_or("".to_owned());
+    let password = params.get("password").map(|x| x.clone()).unwrap_or("".to_owned());
+    cookies.add(Cookie::new("login_token", username));
+    body += "Logged in";
+    generate_template(None, &body)
+}
+
+async fn sign_out(cookies: Cookies) -> Html<String> {
+    let head = r#"<meta http-equiv="Refresh" content="0; url='/'" />"#;
+    let body = "";
+    cookies.remove(Cookie::new("login_token", ""));
+    generate_template(Some(head), body)
+}
+
 async fn game() -> Html<String> {
     let header = "<h1><a href=\"/\">PPTE</a></h1>".to_string();
     let contents = header + &format!("<canvas id=\"my_canvas\"></canvas>
@@ -118,7 +159,6 @@ async fn game() -> Html<String> {
 <script type=\"module\" src=\"./static/client.js?v={}\"></script>
 
 <script type=\"module\">
-        document.getElementById(\"my_canvas\").focus();
         import main from \"./static/client.js?v={}\";
         main();
 </script>", version.to_string(), version.to_string());

@@ -1,9 +1,10 @@
+use core::time;
 use std::collections::HashMap;
 
-use enums::{Mino, Rotation, Shapes};
+use enums::{LoopState, Mino, Rotation, Shapes};
 use tables::Tables;
 
-use crate::{blockstacker::BlockStacker, randomizer::Randomizer, vectors::BVec};
+use crate::{blockstacker::{BlockStacker, Tuning}, randomizer::Randomizer, vectors::BVec, Sprite};
 
 #[cfg(test)]
 mod tests;
@@ -14,12 +15,12 @@ mod tables;
 #[derive(Clone)]
 struct C_Mino {
     vec: Vec<BVec>,
-    color: Mino,
+    color: Sprite,
     shape: Shapes,
     rot: Rotation,
 }
 impl C_Mino {
-    pub fn new(vec: Vec<BVec>, color: Mino, shape: Shapes) -> C_Mino {
+    pub fn new(vec: Vec<BVec>, color: Sprite, shape: Shapes) -> C_Mino {
         C_Mino {
             vec,
             color,
@@ -30,10 +31,12 @@ impl C_Mino {
 }
 
 pub struct Tet {
-    minos: HashMap<BVec, Mino>,
+    minos: HashMap<BVec, Sprite>,
     randomizer: Randomizer,
     controlled_mino: Option<C_Mino>,
     tables: Tables,
+    loop_state: LoopState,
+    tuning: Tuning,
 }
 impl Tet {
     fn spawn_c_mino(&mut self, shape: Shapes) {
@@ -87,13 +90,13 @@ impl Tet {
         ];
 
         match shape {
-            Shapes::O => self.controlled_mino = Some(C_Mino::new(o, Mino::Yellow, shape)),
-            Shapes::L => self.controlled_mino = Some(C_Mino::new(l, Mino::Orange, shape)),
-            Shapes::J => self.controlled_mino = Some(C_Mino::new(j, Mino::Blue, shape)),
-            Shapes::T => self.controlled_mino = Some(C_Mino::new(t, Mino::Purple, shape)),
-            Shapes::I => self.controlled_mino = Some(C_Mino::new(i, Mino::LightBlue, shape)),
-            Shapes::Z => self.controlled_mino = Some(C_Mino::new(z, Mino::Red, shape)),
-            Shapes::S => self.controlled_mino = Some(C_Mino::new(s, Mino::Green, shape)),
+            Shapes::O => self.controlled_mino = Some(C_Mino::new(o, Sprite::TetO, shape)),
+            Shapes::L => self.controlled_mino = Some(C_Mino::new(l, Sprite::TetL, shape)),
+            Shapes::J => self.controlled_mino = Some(C_Mino::new(j, Sprite::TetJ, shape)),
+            Shapes::T => self.controlled_mino = Some(C_Mino::new(t, Sprite::TetT, shape)),
+            Shapes::I => self.controlled_mino = Some(C_Mino::new(i, Sprite::TetI, shape)),
+            Shapes::Z => self.controlled_mino = Some(C_Mino::new(z, Sprite::TetZ, shape)),
+            Shapes::S => self.controlled_mino = Some(C_Mino::new(s, Sprite::TetS, shape)),
         }
     }
     fn rotate_c_mino(&mut self, rots: i32) {
@@ -102,7 +105,7 @@ impl Tet {
             None => return,
         };
         match c_mino.color {
-            Mino::Yellow => return, // cannot rotate the O mino
+            Sprite::TetO => return, // cannot rotate the O mino
             _ => (),
         }
         let temp = c_mino;
@@ -183,14 +186,15 @@ impl Tet {
         }
         for (v, b) in self.get_board().iter() {
             let s = match b {
-                Mino::Red => "R",
-                Mino::Blue => "B",
-                Mino::Yellow => "Y",
-                Mino::Orange => "O",
-                Mino::Wall => "W",
-                Mino::LightBlue => "L",
-                Mino::Green => "G",
-                Mino::Purple => "P",
+                Sprite::Wall => "#",
+                Sprite::TetT => "T",
+                Sprite::TetI => "I",
+                Sprite::TetO => "O",
+                Sprite::TetJ => "J",
+                Sprite::TetL => "L",
+                Sprite::TetS => "S",
+                Sprite::TetZ => "Z",
+                _ => panic!()
             }
             .to_owned();
             grid[v.y as usize][v.x as usize] = s;
@@ -206,15 +210,20 @@ impl Tet {
         }
         out
     }
+    /// returns the rows to be cleared
+    /// let the caller get rid of the lines
+    fn clear_lines(&mut self) -> Vec<usize> {
+        todo!()
+    }
 }
 
-impl BlockStacker<Mino> for Tet {
-    fn new(width: i32, height: i32, randomizer: crate::randomizer::Randomizer) -> Self {
-        let mut minos: HashMap<BVec, Mino> = HashMap::new();
+impl BlockStacker for Tet {
+    fn new(width: i32, height: i32, randomizer: crate::randomizer::Randomizer, tuning: Tuning) -> Self {
+        let mut minos: HashMap<BVec, Sprite> = HashMap::new();
         for i in 0..=width + 1 {
             for j in 0..=height + 1 {
                 if i % (width + 1) == 0 || j == height + 1 {
-                    minos.insert(BVec { x: i, y: j }, Mino::Wall);
+                    minos.insert(BVec::new(i, j), Sprite::Wall);
                 };
             }
         }
@@ -224,10 +233,12 @@ impl BlockStacker<Mino> for Tet {
             randomizer: randomizer,
             controlled_mino: None,
             tables: Tables::new(),
+            loop_state: LoopState::Spawning,
+            tuning,
         }
     }
 
-    fn get_board(&self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
+    fn get_board(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
         let vecs = match self.controlled_mino.clone() {
             Some(x) => x.vec,
             None => Vec::new(),
@@ -239,15 +250,15 @@ impl BlockStacker<Mino> for Tet {
         return a;
     }
 
-    fn next_queue(&self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
+    fn next_queue(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
         todo!()
     }
 
-    fn convert_t_to_speedy2d_color(&self, t: &Mino) -> speedy2d::color::Color {
-        todo!()
-    }
+    // fn convert_t_to_speedy2d_color(&self, t: &Mino) -> speedy2d::color::Color {
+    //     todo!()
+    // }
 
-    fn get_controlled_block(&self) -> std::collections::HashMap<crate::vectors::BVec, Mino> {
+    fn get_controlled_block(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
         match &self.controlled_mino {
             None => {HashMap::new()}
             Some(c) => {c.vec.iter().fold(HashMap::new(), |mut acc, x| {
@@ -258,11 +269,11 @@ impl BlockStacker<Mino> for Tet {
     }
 
     fn input_left(&mut self) -> bool {
-        self.move_c_mino_if_no_collision(BVec { x: -1, y: 0 })
+        self.move_c_mino_if_no_collision(BVec::new(-1, 0))
     }
 
     fn input_right(&mut self) -> bool {
-        self.move_c_mino_if_no_collision(BVec { x: 1, y: 0 })
+        self.move_c_mino_if_no_collision(BVec::new(1, 0))
     }
 
     fn input_rotation_right(&mut self) {
@@ -282,7 +293,7 @@ impl BlockStacker<Mino> for Tet {
     }
 
     fn move_c_buyo_down(&mut self) -> bool {
-        self.move_c_mino_if_no_collision(BVec { x: 0, y: 1 })
+        self.move_c_mino_if_no_collision(BVec::new(0, 1))
     }
 
     fn is_on_ground(&self) -> bool {
@@ -308,7 +319,44 @@ impl BlockStacker<Mino> for Tet {
         todo!()
     }
 
-    fn game_loop(&mut self, time_to_freeze: bool) -> i32 {
-        todo!()
+    fn game_loop(&mut self, last_update: u64, current_time: u64) -> bool {
+        let delta_time = current_time - last_update;
+        match self.loop_state {
+            LoopState::Falling => {
+                if delta_time < self.tuning.fall_speed {
+                    return false;
+                }
+                let on_ground = !self.move_c_buyo_down();
+                if on_ground {
+                    self.loop_state = LoopState::LockingOrClearing;
+                }
+            },
+            LoopState::Spawning => {
+                if delta_time < self.tuning.spawn_delay {
+                    return false;
+                }
+                let shape = match self.randomizer.next() {
+                    0 => Shapes::I,
+                    1 => Shapes::J,
+                    2 => Shapes::L,
+                    3 => Shapes::O,
+                    4 => Shapes::S,
+                    5 => Shapes::T,
+                    6 => Shapes::Z,
+                    _ => panic!()
+                };
+                self.spawn_c_mino(shape);
+                self.loop_state = LoopState::Falling;
+            },
+            LoopState::LockingOrClearing => {
+                if delta_time < self.tuning.lock_delay {
+                    return false;
+                }
+            },
+            LoopState::OnFloor(time) => {
+
+            }
+        }
+        true
     }
 }
