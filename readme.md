@@ -14,3 +14,11 @@ the plan is to have a webgame that is similar to tetrio but with more block stac
 
 # why wasm
 i hate javascript, no javascript will every be committed to this repo
+
+# 3ds port
+i am now porting the game to 3ds, browser game is on hold
+
+https://github.com/aerits/ds-ppte
+
+- not sure if i can get websockets to work on 3ds
+- if not, i will just have local multiplayer for 3ds
