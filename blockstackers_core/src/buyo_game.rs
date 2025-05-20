@@ -107,7 +107,7 @@ impl Tables {
 
 pub struct BuyoBuyo {
     buyos: HashMap<BVec, Sprite>,
-    buyos_not_on_grid: Vec<Buyo>,
+    buyos_not_on_grid: Vec<Option<Buyo>>,
     controlled_buyo: Option<(Buyo, Buyo)>,
     randomizer: Randomizer,
     puyos_cleared: i32,           // -- for scoring --
@@ -167,7 +167,9 @@ impl BlockStacker for BuyoBuyo {
             }
             None => (),
         }
-        for b in self.buyos_not_on_grid.iter() {
+        for b in self.buyos_not_on_grid.iter().map(|x| x.unwrap()) {
+            // all of the buyos should be some
+            println!("{}", b.offset_y);
             a.push((b.p.x as f32, b.p.y as f32 + b.offset_y, b.t))
         }
         return a;
@@ -221,6 +223,8 @@ impl BlockStacker for BuyoBuyo {
     /// returns true if something changed
     fn game_loop(&mut self, last_update_time: u64, current_time: u64) -> bool {
         let delta_time = current_time - last_update_time;
+        println!("\x1b[16;00H");
+        println!("{:?}", self.loop_state);
         match self.loop_state {
             LoopState::SpawnNew => {
                 if delta_time < self.tuning.spawn_delay {
@@ -276,6 +280,7 @@ impl BlockStacker for BuyoBuyo {
             LoopState::Locking => {
                 // todo let you leave lock state back to falling state
                 if self.tuning.lock_delay < delta_time {
+                    self.init_gravity();
                     self.loop_state = LoopState::Gravity(0.0);
                 } else {
                     return false;
@@ -296,32 +301,42 @@ impl BlockStacker for BuyoBuyo {
                 self.freeze_c_buyo();
                 self.loop_state = LoopState::Locking;
             },
-            LoopState::Gravity(mut velocity) => {
+            LoopState::Gravity(ref mut velocity) => {
                 if delta_time < 20 {
                     return false;
                 }
-                self.init_gravity();
-                const ACCELERATION: f32 = 1.0;
-                velocity += ACCELERATION;
+                const ACCELERATION: f32 = 0.1;
+                *velocity += ACCELERATION;
+                if *velocity > 1.0 {
+                    *velocity = 1.0;
+                }
+                println!("{}", velocity);
                 let mut index_to_remove: Vec<(usize, i32)> = Vec::new();
                 // apply gravity on each buyo
                 for (i, buyo) in self.buyos_not_on_grid.iter_mut().enumerate() {
-                    buyo.offset_y += velocity;
+                    let buyo = buyo.as_mut().unwrap(); // at this point in the loop there should be no Nones
+                    buyo.offset_y += *velocity;
                     let pos_y = buyo.p.y + buyo.offset_y.floor() as i32;
                     if self.buyos.contains_key(&BVec::new(buyo.p.x, pos_y + 1)) {
                         index_to_remove.push((i, pos_y));
                     }
                 } // if the buyo hits another buyo while falling (remember positive y goes down), it stops moving
                 for (i, pos_y) in index_to_remove.iter() {
-                    let b = self.buyos_not_on_grid[*i];
-                    self.buyos.insert(BVec::new(b.p.x, *pos_y), b.t);
+                    let b = self.buyos_not_on_grid[*i].unwrap();
+                    self.buyos_not_on_grid[*i] = None;
+                    let mut b_new = BVec::new(b.p.x, *pos_y);
+                    while self.buyos.contains_key(&b_new) {
+                        // move the buyo up if its trying to be placed inside another buyo
+                        b_new.add_i(0, -1);
+                    }
+                    self.buyos.insert(b_new, b.t);
                 }
-                for (i, _) in index_to_remove {
-                    self.buyos_not_on_grid.swap_remove(i);
-                }
+                self.buyos_not_on_grid = self.buyos_not_on_grid.iter().filter(|x| x.is_some()).map(|x| *x).collect();
+                self.init_gravity();
                 if self.buyos_not_on_grid.len() == 0 {
                     self.loop_state = LoopState::Chaining;
                 }
+                
             },
             LoopState::Chaining => {
                 if delta_time < self.tuning.clear_delay {
@@ -336,7 +351,7 @@ impl BlockStacker for BuyoBuyo {
                 }
             }
         }
-        println!("{:?}", self.loop_state);
+        // println!("{:?}", self.loop_state);
         return true;
     }
 }
@@ -490,7 +505,7 @@ impl BuyoBuyo {
         }
         for v in buyos_to_move {
             let sprite = self.buyos.remove(&v).unwrap();
-            self.buyos_not_on_grid.push(Buyo { p: v, offset_x: 0.0, offset_y: 0.0, t: sprite });
+            self.buyos_not_on_grid.push(Some(Buyo { p: v, offset_x: 0.0, offset_y: 0.0, t: sprite }));
         }
     }
     // pop the buyos that are 4 or more of the same Color connecting
