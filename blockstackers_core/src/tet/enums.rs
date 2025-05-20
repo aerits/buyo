@@ -35,6 +35,7 @@ pub enum Rotation {
     Left = 3,
 }
 
+#[derive(Debug)]
 pub enum LoopState {
     Falling,
     Spawning,

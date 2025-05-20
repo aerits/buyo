@@ -4,7 +4,12 @@ use std::collections::HashMap;
 use enums::{LoopState, Mino, Rotation, Shapes};
 use tables::Tables;
 
-use crate::{blockstacker::{BlockStacker, Tuning}, randomizer::Randomizer, vectors::BVec, Sprite};
+use crate::{
+    blockstacker::{BlockStacker, Tuning},
+    randomizer::Randomizer,
+    vectors::BVec,
+    Sprite,
+};
 
 #[cfg(test)]
 mod tests;
@@ -32,6 +37,8 @@ impl C_Mino {
 
 pub struct Tet {
     minos: HashMap<BVec, Sprite>,
+    board_height: usize,
+    board_width: usize,
     randomizer: Randomizer,
     controlled_mino: Option<C_Mino>,
     tables: Tables,
@@ -39,6 +46,32 @@ pub struct Tet {
     tuning: Tuning,
 }
 impl Tet {
+    pub fn new(
+        width: i32,
+        height: i32,
+        randomizer: crate::randomizer::Randomizer,
+        tuning: Tuning,
+    ) -> Self {
+        let mut minos: HashMap<BVec, Sprite> = HashMap::new();
+        for i in 0..=width + 1 {
+            for j in 0..=height + 1 {
+                if i % (width + 1) == 0 || j == height + 1 {
+                    minos.insert(BVec::new(i, j), Sprite::Wall);
+                };
+            }
+        }
+
+        Tet {
+            minos,
+            randomizer: randomizer,
+            controlled_mino: None,
+            tables: Tables::new(),
+            loop_state: LoopState::Spawning,
+            tuning,
+            board_height: height as usize,
+            board_width: width as usize,
+        }
+    }
     fn spawn_c_mino(&mut self, shape: Shapes) {
         let o = vec![
             BVec::new(5, 0),
@@ -194,7 +227,7 @@ impl Tet {
                 Sprite::TetL => "L",
                 Sprite::TetS => "S",
                 Sprite::TetZ => "Z",
-                _ => panic!()
+                _ => panic!(),
             }
             .to_owned();
             grid[v.y as usize][v.x as usize] = s;
@@ -213,30 +246,31 @@ impl Tet {
     /// returns the rows to be cleared
     /// let the caller get rid of the lines
     fn clear_lines(&mut self) -> Vec<usize> {
-        todo!()
+        let mut vec = Vec::new();
+        'row: for row in 0..self.board_height {
+            for column in 0..self.board_width {
+                let current = self.minos.get(&BVec::new(column as i32, row as i32));
+                if current.is_none() {
+                    continue 'row;
+                }
+            }
+            // if it gets here, there was no holes in the row
+            vec.push(row);
+        }
+        return vec;
+    }
+    fn freeze_c_mino(&mut self) {
+        let m = self.controlled_mino.take();
+        if m.is_none() {return;}
+        let m = m.unwrap();
+        for v in m.vec {
+            self.minos.insert(v, m.color);
+        }
     }
 }
 
 impl BlockStacker for Tet {
-    fn new(width: i32, height: i32, randomizer: crate::randomizer::Randomizer, tuning: Tuning) -> Self {
-        let mut minos: HashMap<BVec, Sprite> = HashMap::new();
-        for i in 0..=width + 1 {
-            for j in 0..=height + 1 {
-                if i % (width + 1) == 0 || j == height + 1 {
-                    minos.insert(BVec::new(i, j), Sprite::Wall);
-                };
-            }
-        }
-
-        Tet {
-            minos,
-            randomizer: randomizer,
-            controlled_mino: None,
-            tables: Tables::new(),
-            loop_state: LoopState::Spawning,
-            tuning,
-        }
-    }
+    
 
     fn get_board(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
         let vecs = match self.controlled_mino.clone() {
@@ -251,7 +285,8 @@ impl BlockStacker for Tet {
     }
 
     fn next_queue(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
-        todo!()
+        // todo!()
+        return HashMap::new();
     }
 
     // fn convert_t_to_speedy2d_color(&self, t: &Mino) -> speedy2d::color::Color {
@@ -266,7 +301,8 @@ impl BlockStacker for Tet {
         //         acc
         //     })}
         // }
-        todo!()
+        // todo!()
+        return Vec::new();
     }
 
     fn input_left(&mut self) -> bool {
@@ -291,6 +327,7 @@ impl BlockStacker for Tet {
 
     fn hard_drop(&mut self) {
         while self.move_c_buyo_down() {}
+        self.freeze_c_mino();
     }
 
     fn move_c_buyo_down(&mut self) -> bool {
@@ -302,7 +339,7 @@ impl BlockStacker for Tet {
             Some(x) => &x.vec,
             None => return false,
         };
-        let mut output = true;
+        let mut output = false;
         for v in vectors {
             let u = v + &BVec::new(0, 1);
             if self.minos.contains_key(&u) {
@@ -317,21 +354,28 @@ impl BlockStacker for Tet {
     }
 
     fn total_score(&self) -> i32 {
-        todo!()
+        // todo!()
+        return 0;
     }
 
     fn game_loop(&mut self, last_update: u64, current_time: u64) -> bool {
         let delta_time = current_time - last_update;
+        println!("\x1b[16;00H");
+        println!("{:?}", self.loop_state);
         match self.loop_state {
             LoopState::Falling => {
                 if delta_time < self.tuning.fall_speed {
                     return false;
                 }
-                let on_ground = !self.move_c_buyo_down();
-                if on_ground {
+                self.move_c_buyo_down();
+
+                if self.is_on_ground() {
+                    self.loop_state = LoopState::OnFloor(current_time);
+                }
+                if self.controlled_mino.is_none() {
                     self.loop_state = LoopState::LockingOrClearing;
                 }
-            },
+            }
             LoopState::Spawning => {
                 if delta_time < self.tuning.spawn_delay {
                     return false;
@@ -344,18 +388,32 @@ impl BlockStacker for Tet {
                     4 => Shapes::S,
                     5 => Shapes::T,
                     6 => Shapes::Z,
-                    _ => panic!()
+                    _ => panic!(),
                 };
                 self.spawn_c_mino(shape);
                 self.loop_state = LoopState::Falling;
-            },
+            }
             LoopState::LockingOrClearing => {
-                if delta_time < self.tuning.lock_delay {
+                if delta_time < self.tuning.clear_delay {
                     return false;
                 }
-            },
+                self.freeze_c_mino();
+                let cleared_lines = self.clear_lines();
+                for line in cleared_lines {
+                    for col in 1..self.board_width-1 {
+                        self.minos.remove(&BVec::new(col as i32, line as i32));
+                    }
+                }
+                self.loop_state = LoopState::Spawning;
+            }
             LoopState::OnFloor(time) => {
-
+                if !self.is_on_ground() {
+                    self.loop_state = LoopState::Falling;
+                }
+                if current_time - time < self.tuning.freeze_delay {
+                    return false;
+                }
+                self.loop_state = LoopState::LockingOrClearing;
             }
         }
         true

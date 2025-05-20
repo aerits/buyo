@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt::Display;
-use crate::randomizer::Randomizer;
+use crate::buyo_game::BuyoBuyo;
+use crate::randomizer::{self, Randomizer};
+use crate::tet::Tet;
 use crate::vectors::BVec;
 use crate::Sprite;
 
@@ -11,7 +13,7 @@ pub trait color {
 }
 
 pub trait BlockStacker {
-    fn new(width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Self;
+    // fn new(width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Box<>;
     fn get_board(&self) -> HashMap<BVec, Sprite>;
     fn next_queue(&self) -> HashMap<BVec, Sprite>;
     fn get_controlled_block(&self) -> Vec<(f32, f32, Sprite)>;
@@ -26,6 +28,16 @@ pub trait BlockStacker {
     fn score(&self) -> i32;
     fn total_score(&self) -> i32;
     fn game_loop(&mut self, last_update_time: u64, current_time: u64) -> bool;
+}
+
+impl dyn BlockStacker {
+    pub fn new(type_: &str, width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Box<dyn BlockStacker> {
+        match type_ {
+            "buyo" => Box::new(BuyoBuyo::new(width, height, randomizer, tuning)),
+            "tet" => Box::new(Tet::new(width, height, randomizer, tuning)),
+            _ => panic!()
+        }
+    }
 }
 
 /// milliseconds for every thing that can be changed

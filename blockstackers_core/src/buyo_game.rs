@@ -52,6 +52,7 @@ impl Display for BType {
 }
 
 fn to_sprite(i: i32) -> Sprite {
+    let i = i % 4;
     match i {
         0 => Sprite::BuyoRed,
         1 => Sprite::BuyoBlue,
@@ -122,31 +123,7 @@ pub struct BuyoBuyo {
 }
 
 impl BlockStacker for BuyoBuyo {
-    // create a game board
-    fn new(width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Self {
-        let mut buyos = HashMap::new();
-        for x in 0..width + 2 {
-            for y in 0..height + 2 {
-                if x == 0 || x == width + 1 || y == 0 || y == height + 1 {
-                    buyos.insert(BVec::new(x, y), Sprite::Wall);
-                }
-            }
-        }
-        BuyoBuyo {
-            buyos,
-            buyos_not_on_grid: Vec::new(),
-            controlled_buyo: None,
-            randomizer,
-            puyos_cleared: 0,
-            chain_power: 0,
-            group_bonus: Vec::new(),
-            color_bonus: HashSet::new(),
-            tables: Tables::new(),
-            total_score: 0,
-            loop_state: LoopState::SpawnNew,
-            tuning,
-        }
-    }
+    
     fn get_board(&self) -> HashMap<BVec, Sprite> {
         let a = self.buyos.clone();
         return a;
@@ -357,6 +334,31 @@ impl BlockStacker for BuyoBuyo {
 }
 
 impl BuyoBuyo {
+    // create a game board
+    pub fn new(width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Self {
+        let mut buyos = HashMap::new();
+        for x in 0..width + 2 {
+            for y in 0..height + 2 {
+                if x == 0 || x == width + 1 || y == 0 || y == height + 1 {
+                    buyos.insert(BVec::new(x, y), Sprite::Wall);
+                }
+            }
+        }
+        BuyoBuyo {
+            buyos,
+            buyos_not_on_grid: Vec::new(),
+            controlled_buyo: None,
+            randomizer,
+            puyos_cleared: 0,
+            chain_power: 0,
+            group_bonus: Vec::new(),
+            color_bonus: HashSet::new(),
+            tables: Tables::new(),
+            total_score: 0,
+            loop_state: LoopState::SpawnNew,
+            tuning,
+        }
+    }
     // set controlled buyo to the inputted buyo
     // if there already is a buyo return false
     fn spawn_c_buyo(&mut self, b: (Buyo, Buyo)) -> bool {
