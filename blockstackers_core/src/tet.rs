@@ -1,5 +1,5 @@
 use core::time;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::format};
 
 use enums::{LoopState, Mino, Rotation, Shapes};
 use tables::Tables;
@@ -79,46 +79,46 @@ impl Tet {
             BVec::new(6, 1),
             BVec::new(5, 1),
         ];
-
+        // rotation pivot is the first entry
         let i = vec![
-            BVec::new(4, 1),
             BVec::new(5, 1),
+            BVec::new(4, 1),
             BVec::new(6, 1),
             BVec::new(7, 1),
         ];
 
-        let l = vec![
+        let j = vec![
+            BVec::new(5, 1),
             BVec::new(4, 1),
             BVec::new(4, 0),
-            BVec::new(5, 1),
             BVec::new(6, 1),
         ];
 
-        let j = vec![
-            BVec::new(4, 1),
+        let l = vec![
             BVec::new(5, 1),
+            BVec::new(4, 1),
             BVec::new(6, 1),
             BVec::new(6, 0),
         ];
 
         let s = vec![
+            BVec::new(5, 0),
             BVec::new(4, 1),
             BVec::new(5, 1),
-            BVec::new(5, 0),
             BVec::new(6, 0),
         ];
 
         let z = vec![
-            BVec::new(4, 0),
             BVec::new(5, 0),
+            BVec::new(4, 0),
             BVec::new(5, 1),
             BVec::new(6, 1),
         ];
 
         let t = vec![
-            BVec::new(4, 1),
             BVec::new(5, 1),
             BVec::new(5, 0),
+            BVec::new(4, 1),
             BVec::new(6, 1),
         ];
 
@@ -141,50 +141,59 @@ impl Tet {
             Sprite::TetO => return, // cannot rotate the O mino
             _ => (),
         }
-        let temp = c_mino;
+        let mut temp = c_mino.clone();
         let mut origin = temp.vec[0].clone();
         origin.mult_s(-1);
         for v in &mut temp.vec {
+            // move vectors to 0,0
             v.add_v(origin);
         }
         for v in &mut temp.vec {
+            // rotate all vecs around 0,0
             for _ in 0..rots {
                 let x_old = v.x;
                 v.x = v.y;
                 v.y = -x_old;
             }
         }
+        origin.mult_s(-1);
+        for v in &mut temp.vec {
+            // move vectors back to original spot
+            v.add_v(origin);
+        }
         // SRS system
         let rotation_final = match (temp.rot as i32 + rots) % 4 {
             0 => Rotation::Up,
-            1 => Rotation::Right,
+            1 => Rotation::Left,
             2 => Rotation::Down,
-            3 => Rotation::Left,
+            3 => Rotation::Right,
             _ => panic!("This is an impossible state"),
         };
-        let mut kicks = self
+        println!("{:?}", rotation_final);
+        let kicks = self
             .tables
             .get_kicks(&temp.rot, &rotation_final, &temp.shape);
-        // reverse y coordinate because the game's systems are 0 y is the top of the screeen
-        for kick in &mut kicks {
-            kick.y = kick.y * -1;
-        }
         // test each kick until one works
-        for kick in &kicks {
+        'outer: for kick in &kicks {
             let mut pos = temp.vec.clone();
             let mut collided = false;
+            let kick = &BVec::new(kick.x, -kick.y);
             for v in &mut pos {
                 v.add_v(*kick);
                 if self.minos.contains_key(&v) {
                     collided = true;
-                    break;
+                    continue 'outer;
                 }
             }
             if !collided {
                 temp.vec = pos;
+                temp.rot = rotation_final;
+                *c_mino = temp; // set original controlled mino to the temporary mino
                 return;
             }
         }
+        // unable to rotate if it gets here
+        // don't do anything
     }
     fn move_c_mino_if_no_collision(&mut self, v: BVec) -> bool {
         let mino = match &mut self.controlled_mino {
@@ -199,6 +208,21 @@ impl Tet {
             }
         }
         mino.vec = new_pos;
+        return true;
+    }
+    fn move_mino_if_no_collision(&self, m: &mut Vec<(f32, f32, Sprite)>, v: BVec) -> bool {
+        let sprite = m[0].2;
+        let pos = m.iter().map(|(x, y, _)| BVec::new(*x as i32, *y as i32));
+        let new_pos: Vec<BVec> = pos.map(|x| &x + &v).collect();
+        for vec in &new_pos {
+            if self.minos.contains_key(vec) {
+                return false;
+            }
+        }
+        *m = new_pos
+            .iter()
+            .map(|x| (x.x as f32, x.y as f32, sprite))
+            .collect();
         return true;
     }
     fn print_board(&self) -> String {
@@ -247,8 +271,8 @@ impl Tet {
     /// let the caller get rid of the lines
     fn clear_lines(&mut self) -> Vec<usize> {
         let mut vec = Vec::new();
-        'row: for row in 0..self.board_height {
-            for column in 0..self.board_width {
+        'row: for row in 0..self.board_height + 1 {
+            for column in 0..self.board_width + 2 {
                 let current = self.minos.get(&BVec::new(column as i32, row as i32));
                 if current.is_none() {
                     continue 'row;
@@ -261,7 +285,9 @@ impl Tet {
     }
     fn freeze_c_mino(&mut self) {
         let m = self.controlled_mino.take();
-        if m.is_none() {return;}
+        if m.is_none() {
+            return;
+        }
         let m = m.unwrap();
         for v in m.vec {
             self.minos.insert(v, m.color);
@@ -270,18 +296,8 @@ impl Tet {
 }
 
 impl BlockStacker for Tet {
-    
-
     fn get_board(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
-        let vecs = match self.controlled_mino.clone() {
-            Some(x) => x.vec,
-            None => Vec::new(),
-        };
-        let mut a = self.minos.clone();
-        for i in vecs {
-            a.insert(i, self.controlled_mino.as_ref().unwrap().color);
-        }
-        return a;
+        return self.minos.clone();
     }
 
     fn next_queue(&self) -> std::collections::HashMap<crate::vectors::BVec, Sprite> {
@@ -294,15 +310,35 @@ impl BlockStacker for Tet {
     // }
 
     fn get_controlled_block(&self) -> Vec<(f32, f32, Sprite)> {
-        // match &self.controlled_mino {
-        //     None => {HashMap::new()}
-        //     Some(c) => {c.vec.iter().fold(HashMap::new(), |mut acc, x| {
-        //         acc.insert(*x, c.color);
-        //         acc
-        //     })}
-        // }
-        // todo!()
-        return Vec::new();
+        let mut a = match &self.controlled_mino {
+            None => Vec::new(),
+            Some(c) => c
+                .vec
+                .iter()
+                .map(|x| (x.x as f32, x.y as f32, c.color))
+                .collect(),
+        };
+        let mut b = a.clone().iter().map(|(x, y, s)| {
+            (
+                *x,
+                *y,
+                match s {
+                    Sprite::TetT => Sprite::TetGhostT,
+                    Sprite::TetI => Sprite::TetGhostI,
+                    Sprite::TetO => Sprite::TetGhostO,
+                    Sprite::TetJ => Sprite::TetGhostJ,
+                    Sprite::TetL => Sprite::TetGhostL,
+                    Sprite::TetS => Sprite::TetGhostS,
+                    Sprite::TetZ => Sprite::TetGhostZ,
+                    _ => panic!("Invalid state"),
+                },
+            )
+        }).collect();
+        while a.len() > 0 && self.move_mino_if_no_collision(&mut b, BVec::new(0, 1)) {}
+        for i in a {
+            b.push(i);
+        }
+        return b;
     }
 
     fn input_left(&mut self) -> bool {
@@ -367,8 +403,10 @@ impl BlockStacker for Tet {
                 if delta_time < self.tuning.fall_speed {
                     return false;
                 }
-                self.move_c_buyo_down();
-
+                for _ in 0..self.tuning.fall_skip.ceil() as usize {
+                    self.move_c_buyo_down();
+                }
+                
                 if self.is_on_ground() {
                     self.loop_state = LoopState::OnFloor(current_time);
                 }
@@ -399,10 +437,23 @@ impl BlockStacker for Tet {
                 }
                 self.freeze_c_mino();
                 let cleared_lines = self.clear_lines();
+                println!("clearing minos~~");
                 for line in cleared_lines {
-                    for col in 1..self.board_width-1 {
+                    for col in 1..self.board_width + 1 {
                         self.minos.remove(&BVec::new(col as i32, line as i32));
+                        // remove the line
                     }
+                    self.minos = self
+                        .minos
+                        .iter()
+                        .map(|(v, s)| {
+                            if v.y < line as i32 {
+                                (v + &BVec::new(0, 1), *s)
+                            } else {
+                                (*v, *s)
+                            }
+                        })
+                        .collect();
                 }
                 self.loop_state = LoopState::Spawning;
             }
@@ -417,5 +468,11 @@ impl BlockStacker for Tet {
             }
         }
         true
+    }
+    fn get_loop_state(&self) -> String {
+        return format!("{:?}", self.loop_state);
+    }
+    fn get_mut_tuning(&mut self) -> &mut Tuning {
+        return &mut self.tuning;
     }
 }

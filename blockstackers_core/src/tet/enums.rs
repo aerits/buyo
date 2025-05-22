@@ -27,12 +27,12 @@ pub enum Shapes {
     Z,
     S,
 }
-#[derive(Eq, Hash, PartialEq, Copy, Clone)]
+#[derive(Eq, Hash, PartialEq, Copy, Clone, Debug)]
 pub enum Rotation {
     Up = 0,
-    Right = 1,
+    Left = 1,
     Down = 2,
-    Left = 3,
+    Right = 3,
 }
 
 #[derive(Debug)]

@@ -28,6 +28,8 @@ pub trait BlockStacker {
     fn score(&self) -> i32;
     fn total_score(&self) -> i32;
     fn game_loop(&mut self, last_update_time: u64, current_time: u64) -> bool;
+    fn get_loop_state(&self) -> String;
+    fn get_mut_tuning(&mut self) -> &mut Tuning;
 }
 
 impl dyn BlockStacker {
@@ -48,11 +50,14 @@ pub struct Tuning {
     pub freeze_delay: u64,
     pub clear_delay: u64,
     pub spawn_delay: u64,
+    /// ms to wait between moving the block down by fall skip
     pub fall_speed: u64,
+    /// how many blocks the block moves down by every fall speed
+    pub fall_skip: f32,
 }
 
 impl Tuning {
     pub fn new() -> Tuning {
-        Tuning { das: 133, arr: 5, lock_delay: 20, freeze_delay: 1000, clear_delay: 500, spawn_delay: 0, fall_speed: 200 }
+        Tuning { das: 133, arr: 5, lock_delay: 20, freeze_delay: 1000, clear_delay: 500, spawn_delay: 0, fall_speed: 200, fall_skip: 0.5 }
     }
 }

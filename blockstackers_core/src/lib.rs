@@ -24,6 +24,14 @@ pub enum Sprite {
     TetL,
     TetS,
     TetZ,
+
+    TetGhostT,
+    TetGhostI,
+    TetGhostO,
+    TetGhostJ,
+    TetGhostL,
+    TetGhostS,
+    TetGhostZ,
 }
 impl Display for Sprite {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
