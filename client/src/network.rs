@@ -1,13 +1,11 @@
 use crate::enums::GameState;
-use blockstackers_core::blockstacker::{color, BlockStacker};
-use blockstackers_core::buyo_game::BType;
 use blockstackers_core::vectors::BVec;
+use blockstackers_core::Sprite;
 use futures::{SinkExt, StreamExt};
 use pharos::{Events, Observable, ObserveConfig};
 use regex::Regex;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::Display;
 use std::str::FromStr;
 use ws_stream_wasm::{WsEvent, WsMessage, WsMeta, WsStream};
 
@@ -37,7 +35,7 @@ impl NetworkConnection {
 
 }
 
-pub fn serialize_game<T: BlockStacker<F>, F: Display>(game: &GameState) -> String {
+pub fn serialize_game(game: &GameState) -> String {
     let mut s = String::new();
     match game {
         GameState::Gaming(game) => {
@@ -46,8 +44,8 @@ pub fn serialize_game<T: BlockStacker<F>, F: Display>(game: &GameState) -> Strin
                 let a = "(".to_owned() +  &v.to_string() +  "," + &c.to_string() + ")";
                 s.push_str( &a );
             }
-            for (v, c) in game.game.get_controlled_block() {
-                let a = "(".to_owned() +  &v.to_string() +  "," + &c.to_string() + ")";
+            for (x, y, c) in game.game.get_controlled_block() {
+                let a = "(".to_owned() +  &BVec::new(x as i32, y as i32).to_string() +  "," + &c.to_string() + ")";
                 s.push_str( &a );
             }
         }
@@ -65,7 +63,7 @@ pub fn serialize_game<T: BlockStacker<F>, F: Display>(game: &GameState) -> Strin
     s
 }
 
-pub fn deserialize_game(game: &str)  -> HashMap<BVec, BType> {
+pub fn deserialize_game(game: &str)  -> HashMap<BVec, Sprite> {
     let mut map = HashMap::new();
     if game.contains("Gaming") {
         let a = game.split("Gaming: ");
@@ -75,7 +73,7 @@ pub fn deserialize_game(game: &str)  -> HashMap<BVec, BType> {
         for i in re.captures_iter( &a ) {
             let x = u32::from_str( &i[1] ).unwrap();
             let y = u32::from_str( &i[2] ).unwrap();
-            let btyp = BType::from_str( &i[3] ).unwrap();
+            let btyp = Sprite::from_str( &i[3] ).unwrap();
             map.insert(BVec::new(x as i32, y as i32),  btyp);
         }
     } else if game.contains("Menu") {

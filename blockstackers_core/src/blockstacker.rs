@@ -35,8 +35,8 @@ pub trait BlockStacker {
 impl dyn BlockStacker {
     pub fn new(type_: &str, width: i32, height: i32, randomizer: Randomizer, tuning: Tuning) -> Box<dyn BlockStacker> {
         match type_ {
-            "buyo" => Box::new(BuyoBuyo::new(width, height, randomizer, tuning)),
-            "tet" => Box::new(Tet::new(width, height, randomizer, tuning)),
+            "buyo" => Box::new(BuyoBuyo::new(6, 12, randomizer, tuning)),
+            "tet" => Box::new(Tet::new(10, 24, randomizer, tuning)),
             _ => panic!()
         }
     }

@@ -102,16 +102,16 @@ impl Tet {
         ];
 
         let s = vec![
+            BVec::new(5, 1),
             BVec::new(5, 0),
             BVec::new(4, 1),
-            BVec::new(5, 1),
             BVec::new(6, 0),
         ];
 
         let z = vec![
-            BVec::new(5, 0),
-            BVec::new(4, 0),
             BVec::new(5, 1),
+            BVec::new(4, 0),
+            BVec::new(5, 0),
             BVec::new(6, 1),
         ];
 
@@ -318,22 +318,26 @@ impl BlockStacker for Tet {
                 .map(|x| (x.x as f32, x.y as f32, c.color))
                 .collect(),
         };
-        let mut b = a.clone().iter().map(|(x, y, s)| {
-            (
-                *x,
-                *y,
-                match s {
-                    Sprite::TetT => Sprite::TetGhostT,
-                    Sprite::TetI => Sprite::TetGhostI,
-                    Sprite::TetO => Sprite::TetGhostO,
-                    Sprite::TetJ => Sprite::TetGhostJ,
-                    Sprite::TetL => Sprite::TetGhostL,
-                    Sprite::TetS => Sprite::TetGhostS,
-                    Sprite::TetZ => Sprite::TetGhostZ,
-                    _ => panic!("Invalid state"),
-                },
-            )
-        }).collect();
+        let mut b = a
+            .clone()
+            .iter()
+            .map(|(x, y, s)| {
+                (
+                    *x,
+                    *y,
+                    match s {
+                        Sprite::TetT => Sprite::TetGhostT,
+                        Sprite::TetI => Sprite::TetGhostI,
+                        Sprite::TetO => Sprite::TetGhostO,
+                        Sprite::TetJ => Sprite::TetGhostJ,
+                        Sprite::TetL => Sprite::TetGhostL,
+                        Sprite::TetS => Sprite::TetGhostS,
+                        Sprite::TetZ => Sprite::TetGhostZ,
+                        _ => panic!("Invalid state"),
+                    },
+                )
+            })
+            .collect();
         while a.len() > 0 && self.move_mino_if_no_collision(&mut b, BVec::new(0, 1)) {}
         for i in a {
             b.push(i);
@@ -406,7 +410,7 @@ impl BlockStacker for Tet {
                 for _ in 0..self.tuning.fall_skip.ceil() as usize {
                     self.move_c_buyo_down();
                 }
-                
+
                 if self.is_on_ground() {
                     self.loop_state = LoopState::OnFloor(current_time);
                 }
