@@ -390,7 +390,8 @@ impl BlockStacker for Tet {
     }
 
     fn score(&self) -> i32 {
-        todo!()
+        // todo!()
+        return 0;
     }
 
     fn total_score(&self) -> i32 {

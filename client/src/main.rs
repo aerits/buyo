@@ -1,18 +1,19 @@
+use crate::gamehandler::GameHandler;
 use assets::Assets;
 use async_std::task::sleep;
-use blockstackers_core::blockstacker::BlockStacker;
+use blockstackers_core::blockstacker::{BlockStacker, Tuning};
 use blockstackers_core::buyo_game::{BType, BuyoBuyo};
+use blockstackers_core::randomizer::Randomizer;
 use enums::GameState;
 use futures::lock::Mutex;
 use futures::FutureExt;
 use jstime::get_current_time;
 use network::NetworkConnection;
+use speedy2d::color::Color;
+use speedy2d::font::{TextLayout, TextOptions};
 use speedy2d::window::{VirtualKeyCode, WindowHandler, WindowHelper};
 use speedy2d::{Graphics2D, WebCanvas};
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use speedy2d::color::Color;
-use speedy2d::font::{TextLayout, TextOptions};
-use crate::gamehandler::GameHandler;
 
 fn main() {
     // let window = Window::new_centered("Title", (640, 480)).unwrap();
@@ -33,11 +34,11 @@ fn main() {
 }
 
 mod assets;
+mod draw_scaled;
 mod enums;
 mod gamehandler;
 mod jstime;
 mod network;
-mod draw_scaled;
 
 async fn start_game() {
     let state = Arc::new(Mutex::new(GameState::LoadingAssets));
@@ -66,16 +67,23 @@ async fn start_game() {
     };
     let net = Arc::new(Mutex::new(net));
 
-    *state.lock().await = GameState::Gaming(GameHandler::new(6, 12));
+    *state.lock().await = GameState::Gaming(GameHandler::new(<dyn BlockStacker>::new(
+        "buyo",
+        6,
+        12,
+        Randomizer::new(4, get_current_time() as u128),
+        Tuning::new(),
+    )));
+
     // let network_loop =
     let draw_loop = async {
         WebCanvas::new_for_id_with_user_events("my_canvas", window).unwrap();
     };
     futures::join!(
-            game_loop(net.clone(), state.clone()),
-            draw_loop,
-            network_loop(net.clone(), state.clone())
-        );
+        game_loop(net.clone(), state.clone()),
+        draw_loop,
+        network_loop(net.clone(), state.clone())
+    );
 }
 
 async fn network_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameState>>) {
@@ -119,11 +127,15 @@ async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameStat
             GameState::Gaming(ref mut game_handler) => {
                 changed = game_handler.update(get_current_time());
                 key_pressed = game_handler.key_pressed;
-                if key_pressed {game_handler.key_pressed = false;}
+                if key_pressed {
+                    game_handler.key_pressed = false;
+                }
             }
             GameState::Menu() => (),
             GameState::LoadingAssets => (),
-            GameState::Error(_) => {panic!("Invalid game state")}
+            GameState::Error(_) => {
+                panic!("Invalid game state")
+            }
         }
         if changed == 1 || failed_to_send || get_current_time() - last_send > 1000 || key_pressed {
             key_pressed = false;
@@ -136,8 +148,7 @@ async fn game_loop(net: Arc<Mutex<NetworkConnection>>, state: Arc<Mutex<GameStat
                     last_send = get_current_time();
                     failed_to_send = false;
                     let game = &*state.lock().await;
-                    x.send(&network::serialize_game::<BuyoBuyo, BType>(game))
-                        .await;
+                    x.send(&network::serialize_game(game)).await;
                 }
             }
         }
@@ -184,8 +195,7 @@ impl WindowHandler for MyWindowHandler {
                 game_handler.draw(graphics, &self.assets);
                 helper.request_redraw();
             }
-            GameState::Menu() => {
-            },
+            GameState::Menu() => {}
             GameState::LoadingAssets => {}
             GameState::Error(ref E) => {
                 let error = &self.assets.font.as_ref().unwrap().layout_text(
